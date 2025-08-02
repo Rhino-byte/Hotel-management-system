@@ -127,7 +127,7 @@ def get_google_sheets_service():
         if creds and creds.expired and creds.refresh_token:
             creds.refresh(Request())
         else:
-            # Try to get credentials from Streamlit secrets (for deployment)
+            # PRIORITY 1: Try to get credentials from Streamlit secrets (for deployment)
             try:
                 # Check if we have service account credentials in secrets
                 if hasattr(st, 'secrets') and st.secrets and 'gcp_service_account' in st.secrets:
@@ -142,7 +142,7 @@ def get_google_sheets_service():
                     )
                     st.success("✅ Using service account credentials from Streamlit secrets")
                 else:
-                    # Fallback to local credentials.json (for local development)
+                    # PRIORITY 2: Fallback to local credentials.json (for local development)
                     if os.path.exists(credentials_path):
                         # Use service account credentials for local development
                         from google.oauth2 import service_account
@@ -152,12 +152,23 @@ def get_google_sheets_service():
                         )
                         st.success("✅ Using local service account credentials")
                     else:
-                        st.error(f"credentials.json file not found at: {credentials_path}")
-                        st.info("For deployment, configure credentials in Streamlit Cloud settings.")
+                        # PRIORITY 3: Check if we're in Streamlit Cloud and show helpful message
+                        if '/mount/src/' in current_dir:
+                            st.error("❌ Running in Streamlit Cloud but no credentials found in secrets")
+                            st.info("""
+                            **To fix this:**
+                            1. Go to your Streamlit Cloud app settings
+                            2. Click "Secrets" 
+                            3. Add your service account credentials in TOML format
+                            4. Save and redeploy
+                            """)
+                        else:
+                            st.error(f"❌ credentials.json file not found at: {credentials_path}")
+                            st.info("For deployment, configure credentials in Streamlit Cloud settings.")
                         return None
                         
             except Exception as e:
-                st.error(f"Error loading credentials: {e}")
+                st.error(f"❌ Error loading credentials: {e}")
                 st.info("Please check your Streamlit Cloud secrets configuration.")
                 return None
         
