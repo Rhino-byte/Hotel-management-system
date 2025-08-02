@@ -1,0 +1,395 @@
+library(shiny)
+library(shinydashboard)
+library(DT)
+library(dplyr)
+library(lubridate)
+
+# Define item categories and their items
+item_categories <- list(
+  "Snacks" = c("Chapo", "Ndazi", "Tm", "Cake", "Hcake", "Eggs", "Omelet", "Sausage/Smokie"),
+  "Food" = c("ChapoMix", "Walimix", "Ugalimix", "PilauMix", "ChapoMinji", "Waliminji", 
+              "Ugaliminji", "PilauMinji", "BeefChapo", "BeefUgali", "BeefRice", "BeefPilau",
+              "UgaliMatumbo", "RiceMatumbo", "ChapoMatumbo", "PilauMatumbo", "UgaliManagu", 
+              "RiceManagu", "ChapoManagu", "PilauManagu", "UgaliFryManagu", "RiceFryManagu", 
+              "ChapoFryManagu", "PilauFryManagu", "UgaliMatumboManagu", "RiceMatumboManagu", 
+              "ChapoMatumboManagu", "PilauMatumboManagu", "UgaliMboga", "RiceMboga", "ChapoMboga", 
+              "UgaliPlain", "MchelePlain", "PilauPlain", "ServiceNyama"),
+  "Kuku" = c("UgaliKukuManagu", "RiceKukuManagu", "ChapoKukuManagu", "PilauKukuManagu",
+              "KukuChapo", "KukuUgali", "KukuRice", "KukuPilau"),
+  "Drinks" = c("BlackCoffee", "WhiteCoffee", "LemonTea", "Concusion", "Predator", 
+               "Soda", "PlasticSoda", "Dasani_.5ltr", "Dasani_1ltr", "Water_.5ltr", "Water_1ltr", 
+               "MinuteMaid"),
+  "No. cups of tea" = c("Tea")
+)
+
+# Create a flat list of all items with their categories
+all_items <- data.frame(
+  item = unlist(item_categories),
+  category = rep(names(item_categories), sapply(item_categories, length)),
+  stringsAsFactors = FALSE
+)
+
+# Initialize reactive values for data storage
+sales_data <- reactiveVal(data.frame(
+  timestamp = character(),
+  item = character(),
+  category = character(),
+  quantity = numeric(),
+  price = numeric(),
+  total = numeric(),
+  stringsAsFactors = FALSE
+))
+
+# UI
+ui <- dashboardPage(
+  dashboardHeader(title = "Hotel Management System", titleWidth = 300),
+  
+  dashboardSidebar(
+    width = 300,
+    sidebarMenu(
+      menuItem("Sales Management", tabName = "sales", icon = icon("shopping-cart")),
+      menuItem("Sales History", tabName = "history", icon = icon("history")),
+      menuItem("Analytics", tabName = "analytics", icon = icon("chart-bar"))
+    )
+  ),
+  
+  dashboardBody(
+    tabItems(
+      # Sales Management Tab
+      tabItem(tabName = "sales",
+        fluidRow(
+          column(width = 8,
+            box(
+              title = "Add Sales Item", 
+              status = "primary", 
+              solidHeader = TRUE,
+              width = NULL,
+              fluidRow(
+                column(width = 6,
+                  selectInput("category", "Category:", 
+                             choices = c("All Categories", names(item_categories)),
+                             selected = "All Categories")
+                ),
+                column(width = 6,
+                  selectInput("item", "Item:", choices = NULL)
+                )
+              ),
+              fluidRow(
+                column(width = 4,
+                  numericInput("quantity", "Quantity:", value = 1, min = 1)
+                ),
+                column(width = 4,
+                  numericInput("price", "Price (KSH):", value = 0, min = 0, step = 0.5)
+                ),
+                column(width = 4,
+                  br(),
+                  actionButton("add_item", "Add Item", class = "btn-success", width = "100%")
+                )
+              )
+            ),
+            
+            box(
+              title = "Current Sale", 
+              status = "info", 
+              solidHeader = TRUE,
+              width = NULL,
+              DTOutput("current_sale_table"),
+              br(),
+              fluidRow(
+                column(width = 6,
+                  h4("Total: ", textOutput("sale_total", inline = TRUE), " KSH")
+                ),
+                column(width = 6,
+                  actionButton("confirm_sale", "Confirm Sale", class = "btn-primary", width = "100%")
+                )
+              )
+            )
+          ),
+          
+          column(width = 4,
+            box(
+              title = "Quick Stats", 
+              status = "success", 
+              solidHeader = TRUE,
+              width = NULL,
+              infoBoxOutput("today_sales", width = 12),
+              infoBoxOutput("today_items", width = 12),
+              infoBoxOutput("avg_sale", width = 12)
+            ),
+            
+            box(
+              title = "Category Summary", 
+              status = "warning", 
+              solidHeader = TRUE,
+              width = NULL,
+              DTOutput("category_summary")
+            )
+          )
+        )
+      ),
+      
+      # Sales History Tab
+      tabItem(tabName = "history",
+        fluidRow(
+          column(width = 12,
+            box(
+              title = "Sales History", 
+              status = "primary", 
+              solidHeader = TRUE,
+              width = NULL,
+              DTOutput("sales_history")
+            )
+          )
+        )
+      ),
+      
+      # Analytics Tab
+      tabItem(tabName = "analytics",
+        fluidRow(
+          column(width = 6,
+            box(
+              title = "Sales by Category", 
+              status = "info", 
+              solidHeader = TRUE,
+              width = NULL,
+              plotOutput("category_chart")
+            )
+          ),
+          column(width = 6,
+            box(
+              title = "Top Selling Items", 
+              status = "success", 
+              solidHeader = TRUE,
+              width = NULL,
+              plotOutput("top_items_chart")
+            )
+          )
+        ),
+        fluidRow(
+          column(width = 12,
+            box(
+              title = "Daily Sales Trend", 
+              status = "warning", 
+              solidHeader = TRUE,
+              width = NULL,
+              plotOutput("daily_trend")
+            )
+          )
+        )
+      )
+    )
+  )
+)
+
+# Server
+server <- function(input, output, session) {
+  
+  # Current sale items
+  current_sale <- reactiveVal(data.frame(
+    item = character(),
+    category = character(),
+    quantity = numeric(),
+    price = numeric(),
+    total = numeric(),
+    stringsAsFactors = FALSE
+  ))
+  
+  # Update item choices based on selected category
+  observe({
+    if (input$category == "All Categories") {
+      choices <- all_items$item
+    } else {
+      choices <- item_categories[[input$category]]
+    }
+    updateSelectInput(session, "item", choices = choices)
+  })
+  
+  # Add item to current sale
+  observeEvent(input$add_item, {
+    if (!is.null(input$item) && input$item != "" && input$quantity > 0 && input$price >= 0) {
+      new_item <- data.frame(
+        item = input$item,
+        category = all_items$category[all_items$item == input$item],
+        quantity = input$quantity,
+        price = input$price,
+        total = input$quantity * input$price,
+        stringsAsFactors = FALSE
+      )
+      
+      current_sale_data <- current_sale()
+      current_sale_data <- rbind(current_sale_data, new_item)
+      current_sale(current_sale_data)
+      
+      # Reset inputs
+      updateNumericInput(session, "quantity", value = 1)
+      updateNumericInput(session, "price", value = 0)
+    }
+  })
+  
+  # Display current sale table
+  output$current_sale_table <- renderDT({
+    data <- current_sale()
+    if (nrow(data) == 0) {
+      return(datatable(data.frame(Message = "No items in current sale"), 
+                      options = list(dom = 't'), rownames = FALSE))
+    }
+    
+    datatable(data, 
+              options = list(dom = 't', pageLength = 10),
+              rownames = FALSE) %>%
+      formatCurrency('price', currency = "KSH ") %>%
+      formatCurrency('total', currency = "KSH ")
+  })
+  
+  # Calculate sale total
+  output$sale_total <- renderText({
+    data <- current_sale()
+    if (nrow(data) == 0) return("0.00")
+    sprintf("%.2f", sum(data$total))
+  })
+  
+  # Confirm sale
+  observeEvent(input$confirm_sale, {
+    data <- current_sale()
+    if (nrow(data) > 0) {
+      # Add timestamp
+      data$timestamp <- as.character(Sys.time())
+      
+      # Add to sales history
+      current_sales <- sales_data()
+      updated_sales <- rbind(current_sales, data)
+      sales_data(updated_sales)
+      
+      # Clear current sale
+      current_sale(data.frame(
+        item = character(),
+        category = character(),
+        quantity = numeric(),
+        price = numeric(),
+        total = numeric(),
+        stringsAsFactors = FALSE
+      ))
+      
+      showNotification("Sale confirmed successfully!", type = "success")
+    }
+  })
+  
+  # Sales history table
+  output$sales_history <- renderDT({
+    data <- sales_data()
+    if (nrow(data) == 0) {
+      return(datatable(data.frame(Message = "No sales recorded yet"), 
+                      options = list(dom = 't'), rownames = FALSE))
+    }
+    
+    datatable(data, 
+              options = list(pageLength = 25, scrollX = TRUE),
+              rownames = FALSE) %>%
+      formatCurrency('price', currency = "KSH ") %>%
+      formatCurrency('total', currency = "KSH ")
+  })
+  
+  # Category summary
+  output$category_summary <- renderDT({
+    data <- sales_data()
+    if (nrow(data) == 0) {
+      return(datatable(data.frame(Message = "No data available"), 
+                      options = list(dom = 't'), rownames = FALSE))
+    }
+    
+    summary_data <- data %>%
+      group_by(category) %>%
+      summarise(
+        Total_Sales = sum(total),
+        Items_Sold = sum(quantity),
+        .groups = 'drop'
+      ) %>%
+      arrange(desc(Total_Sales))
+    
+    datatable(summary_data, 
+              options = list(dom = 't', pageLength = 10),
+              rownames = FALSE) %>%
+      formatCurrency('Total_Sales', currency = "KSH ")
+  })
+  
+  # Quick stats
+  output$today_sales <- renderInfoBox({
+    data <- sales_data()
+    if (nrow(data) == 0) {
+      today_total <- 0
+    } else {
+      today_data <- data %>%
+        filter(as.Date(timestamp) == Sys.Date())
+      today_total <- sum(today_data$total)
+    }
+    
+    infoBox(
+      "Today's Sales",
+      sprintf("%.2f KSH", today_total),
+      icon = icon("money-bill-wave"),
+      color = "green"
+    )
+  })
+  
+  output$today_items <- renderInfoBox({
+    data <- sales_data()
+    if (nrow(data) == 0) {
+      today_items <- 0
+    } else {
+      today_data <- data %>%
+        filter(as.Date(timestamp) == Sys.Date())
+      today_items <- sum(today_data$quantity)
+    }
+    
+    infoBox(
+      "Items Sold Today",
+      today_items,
+      icon = icon("shopping-bag"),
+      color = "blue"
+    )
+  })
+  
+  output$avg_sale <- renderInfoBox({
+    data <- sales_data()
+    if (nrow(data) == 0) {
+      avg_sale <- 0
+    } else {
+      today_data <- data %>%
+        filter(as.Date(timestamp) == Sys.Date())
+      if (nrow(today_data) == 0) {
+        avg_sale <- 0
+      } else {
+        avg_sale <- mean(today_data$total)
+      }
+    }
+    
+    infoBox(
+      "Avg Sale Today",
+      sprintf("%.2f KSH", avg_sale),
+      icon = icon("chart-line"),
+      color = "yellow"
+    )
+  })
+  
+  # Analytics charts (placeholder - would need plotly or ggplot2 for actual charts)
+  output$category_chart <- renderPlot({
+    # Placeholder for category chart
+    plot(1, 1, type = "n", xlab = "", ylab = "", main = "Sales by Category")
+    text(1, 1, "Chart placeholder\n(Add plotly or ggplot2 for actual charts)")
+  })
+  
+  output$top_items_chart <- renderPlot({
+    # Placeholder for top items chart
+    plot(1, 1, type = "n", xlab = "", ylab = "", main = "Top Selling Items")
+    text(1, 1, "Chart placeholder\n(Add plotly or ggplot2 for actual charts)")
+  })
+  
+  output$daily_trend <- renderPlot({
+    # Placeholder for daily trend chart
+    plot(1, 1, type = "n", xlab = "", ylab = "", main = "Daily Sales Trend")
+    text(1, 1, "Chart placeholder\n(Add plotly or ggplot2 for actual charts)")
+  })
+}
+
+# Run the application
+shinyApp(ui = ui, server = server) 
