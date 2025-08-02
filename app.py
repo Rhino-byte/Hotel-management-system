@@ -144,9 +144,13 @@ def get_google_sheets_service():
                 else:
                     # Fallback to local credentials.json (for local development)
                     if os.path.exists(credentials_path):
-                        flow = InstalledAppFlow.from_client_secrets_file(credentials_path, SCOPES)
-                        creds = flow.run_local_server(port=0)
-                        st.success("✅ Using local credentials.json")
+                        # Use service account credentials for local development
+                        from google.oauth2 import service_account
+                        creds = service_account.Credentials.from_service_account_file(
+                            credentials_path, 
+                            scopes=SCOPES
+                        )
+                        st.success("✅ Using local service account credentials")
                     else:
                         st.error(f"credentials.json file not found at: {credentials_path}")
                         st.info("For deployment, configure credentials in Streamlit Cloud settings.")
