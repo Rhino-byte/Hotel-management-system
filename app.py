@@ -11,6 +11,9 @@ from google.auth.transport.requests import Request
 from googleapiclient.discovery import build
 import pickle
 
+# Google Sheets API scopes
+SCOPES = ['https://www.googleapis.com/auth/spreadsheets']
+
 # Page configuration
 st.set_page_config(
     page_title="Hotel Management System",
@@ -100,9 +103,6 @@ ITEM_PRICES = {
 # Password for price editing
 PRICE_EDIT_PASSWORD = "bushman"
 
-# Google Sheets API setup
-SCOPES = ['https://www.googleapis.com/auth/spreadsheets']
-
 # Predefined Google Sheets configuration
 PREDEFINED_SPREADSHEET_ID = "1rEZbc1CroKxW99H7AtsISZMY2wWK6430W2GAKfV2J3M"
 PREDEFINED_SALES_SHEET = "Sales_data"
@@ -112,7 +112,7 @@ def get_google_sheets_service():
     """Initialize Google Sheets API service"""
     creds = None
     
-    # Check if token.pickle exists
+    # Check if token.pickle exists (for local development)
     if os.path.exists('token.pickle'):
         with open('token.pickle', 'rb') as token:
             creds = pickle.load(token)
@@ -122,16 +122,43 @@ def get_google_sheets_service():
         if creds and creds.expired and creds.refresh_token:
             creds.refresh(Request())
         else:
-            if os.path.exists('credentials.json'):
-                flow = InstalledAppFlow.from_client_secrets_file('credentials.json', SCOPES)
-                creds = flow.run_local_server(port=0)
+            # Try to get credentials from Streamlit secrets (for deployment)
+            if hasattr(st, 'secrets') and st.secrets:
+                try:
+                    # Check if we have service account credentials in secrets
+                    if 'gcp_service_account' in st.secrets:
+                        import json
+                        from google.oauth2 import service_account
+                        
+                        # Create credentials from service account info
+                        service_account_info = dict(st.secrets.gcp_service_account)
+                        creds = service_account.Credentials.from_service_account_info(
+                            service_account_info, 
+                            scopes=SCOPES
+                        )
+                        st.success("✅ Using service account credentials from Streamlit secrets")
+                    else:
+                        st.error("No Google Sheets API credentials found in Streamlit secrets.")
+                        st.info("Please configure your credentials in Streamlit Cloud settings.")
+                        return None
+                        
+                except Exception as e:
+                    st.error(f"Error loading credentials from Streamlit secrets: {e}")
+                    return None
             else:
-                st.error("credentials.json file not found. Please set up Google Sheets API credentials.")
-                return None
+                # Fallback to local credentials.json (for local development)
+                if os.path.exists('credentials.json'):
+                    flow = InstalledAppFlow.from_client_secrets_file('credentials.json', SCOPES)
+                    creds = flow.run_local_server(port=0)
+                else:
+                    st.error("credentials.json file not found. Please set up Google Sheets API credentials.")
+                    st.info("For deployment, configure credentials in Streamlit Cloud settings.")
+                    return None
         
-        # Save credentials for next run
-        with open('token.pickle', 'wb') as token:
-            pickle.dump(creds, token)
+        # Save credentials for next run (only for local development)
+        if not hasattr(st, 'secrets') or not st.secrets:
+            with open('token.pickle', 'wb') as token:
+                pickle.dump(creds, token)
     
     return build('sheets', 'v4', credentials=creds)
 
