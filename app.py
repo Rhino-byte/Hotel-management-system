@@ -112,9 +112,14 @@ def get_google_sheets_service():
     """Initialize Google Sheets API service"""
     creds = None
     
+    # Get the current directory
+    current_dir = os.path.dirname(os.path.abspath(__file__))
+    credentials_path = os.path.join(current_dir, 'credentials.json')
+    token_path = os.path.join(current_dir, 'token.pickle')
+    
     # Check if token.pickle exists (for local development)
-    if os.path.exists('token.pickle'):
-        with open('token.pickle', 'rb') as token:
+    if os.path.exists(token_path):
+        with open(token_path, 'rb') as token:
             creds = pickle.load(token)
     
     # If credentials don't exist or are invalid, get new ones
@@ -138,11 +143,12 @@ def get_google_sheets_service():
                     st.success("✅ Using service account credentials from Streamlit secrets")
                 else:
                     # Fallback to local credentials.json (for local development)
-                    if os.path.exists('credentials.json'):
-                        flow = InstalledAppFlow.from_client_secrets_file('credentials.json', SCOPES)
+                    if os.path.exists(credentials_path):
+                        flow = InstalledAppFlow.from_client_secrets_file(credentials_path, SCOPES)
                         creds = flow.run_local_server(port=0)
+                        st.success("✅ Using local credentials.json")
                     else:
-                        st.error("credentials.json file not found. Please set up Google Sheets API credentials.")
+                        st.error(f"credentials.json file not found at: {credentials_path}")
                         st.info("For deployment, configure credentials in Streamlit Cloud settings.")
                         return None
                         
@@ -154,7 +160,7 @@ def get_google_sheets_service():
         # Save credentials for next run (only for local development)
         if not hasattr(st, 'secrets') or not st.secrets:
             try:
-                with open('token.pickle', 'wb') as token:
+                with open(token_path, 'wb') as token:
                     pickle.dump(creds, token)
             except:
                 pass  # Ignore if we can't save token
