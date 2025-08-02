@@ -25,10 +25,10 @@ st.set_page_config(
 # Item categories with prices (in Kenyan Shillings)
 ITEM_PRICES = {
     "Snacks": {
-        "Chapo": 30,
+        "chapo": 30,
         "Ndazi": 20,
         "Tm": 30,
-        "Cake": 30,
+        "cake": 30,
         "Hcake": 30,
         "Eggs": 40,
         "Omelet": 50,
