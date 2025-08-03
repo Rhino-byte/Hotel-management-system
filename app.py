@@ -106,7 +106,7 @@ ITEM_PRICES = {
 }
 
 # Password for price editing
-PRICE_EDIT_PASSWORD = "bushman"
+PRICE_EDIT_PASSWORD = "bushmantop"
 
 # Predefined Google Sheets configuration
 PREDEFINED_SPREADSHEET_ID = "1rEZbc1CroKxW99H7AtsISZMY2wWK6430W2GAKfV2J3M"
