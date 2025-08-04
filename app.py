@@ -443,7 +443,7 @@ def main():
         
         with col1:
             if st.button("📥 Load Sales Data"):
-                range_name = f"{PREDEFINED_SALES_SHEET}!A:AZ"
+                range_name = f"{PREDEFINED_SALES_SHEET}!A:BN"
                 df = read_sales_data(PREDEFINED_SPREADSHEET_ID, range_name)
                 if not df.empty:
                     st.session_state.sales_data = df.to_dict('records')
