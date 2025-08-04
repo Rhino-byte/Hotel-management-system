@@ -897,6 +897,52 @@ def main():
                 with col4:
                     total_orders = len(filtered_df)
                     st.metric("Total Orders", f"{total_orders:,}")
+
+                # Category Summary Table
+                st.subheader("📊 Sales Summary by Category")
+                
+                # Calculate category totals
+                category_summary = filtered_df.groupby('Category').agg({
+                    'Total': 'sum',
+                    'Quantity': 'sum',
+                    'Item': 'count'
+                }).reset_index()
+                
+                # Rename columns for better display
+                category_summary.columns = ['Category', 'Total Sales (KSh)', 'Total Items Sold', 'Number of Orders']
+                
+                # Add all categories from item_prices, even if they have no sales
+                all_categories = list(st.session_state.item_prices.keys())
+                for category in all_categories:
+                    if category not in category_summary['Category'].values:
+                        new_row = pd.DataFrame({
+                            'Category': [category],
+                            'Total Sales (KSh)': [0],
+                            'Total Items Sold': [0],
+                            'Number of Orders': [0]
+                        })
+                        category_summary = pd.concat([category_summary, new_row], ignore_index=True)
+                
+                # Sort by total sales descending
+                category_summary = category_summary.sort_values('Total Sales (KSh)', ascending=False)
+                
+                # Format the Total Sales column for better readability
+                category_summary['Total Sales (KSh)'] = category_summary['Total Sales (KSh)'].apply(lambda x: f"KSh {x:,.2f}")
+                
+                # Display the table
+                st.dataframe(
+                    category_summary,
+                    use_container_width=True,
+                    hide_index=True,
+                    column_config={
+                        "Category": st.column_config.TextColumn("Category", width="medium"),
+                        "Total Sales (KSh)": st.column_config.TextColumn("Total Sales", width="medium"),
+                        "Total Items Sold": st.column_config.NumberColumn("Items Sold", width="small"),
+                        "Number of Orders": st.column_config.NumberColumn("Orders", width="small")
+                    }
+                )
+                
+                st.markdown("---")
                 
                 # Charts
                 col1, col2 = st.columns(2)
