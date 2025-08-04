@@ -99,7 +99,7 @@ ITEM_PRICES = {
         "Water_.5ltr": 40,
         "Water_1ltr": 80,
         "MinuteMaid": 80
-    }#,
+     }#,
     # "No. cups of tea": {
     #     "Tea": 30
     # }
@@ -787,7 +787,7 @@ def main():
                 date_filter = st.date_input(
                     "Filter by Date",
                     value=date.today(),
-                    help="Show sales for specific date"
+                    help="Show sales for a specific date"
                 )
             
             with col2:
