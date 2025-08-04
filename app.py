@@ -733,7 +733,7 @@ def main():
                                 # Save the row to Google Sheets
                                 success = write_sales_data(
                                     st.session_state.spreadsheet_id,
-                                    f"{st.session_state.sheet_name}!A:AZ",
+                                    f"{st.session_state.sheet_name}!A:BN",
                                     row_data
                                 )
                                 if success:
