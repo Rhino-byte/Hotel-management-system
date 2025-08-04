@@ -676,7 +676,7 @@ def main():
                             # Read the header row to get column order
                             header_result = service.spreadsheets().values().get(
                                 spreadsheetId=st.session_state.spreadsheet_id,
-                                range=f"{st.session_state.sheet_name}!A1:AZ1"
+                                range=f"{st.session_state.sheet_name}!A1:BN1"
                             ).execute()
                             
                             header_values = header_result.get('values', [[]])
