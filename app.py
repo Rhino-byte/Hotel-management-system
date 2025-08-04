@@ -1073,66 +1073,66 @@ def main():
     with tab5:
         st.header("⚙️ Setup Instructions")
         
-        st.markdown("""
-        ### Google Sheets API Setup
+        # st.markdown("""
+        # ### Google Sheets API Setup
         
-        1. **Create a Google Cloud Project**:
-           - Go to [Google Cloud Console](https://console.cloud.google.com/)
-           - Create a new project or select existing one
+        # 1. **Create a Google Cloud Project**:
+        #    - Go to [Google Cloud Console](https://console.cloud.google.com/)
+        #    - Create a new project or select existing one
         
-        2. **Enable Google Sheets API**:
-           - Go to "APIs & Services" > "Library"
-           - Search for "Google Sheets API" and enable it
+        # 2. **Enable Google Sheets API**:
+        #    - Go to "APIs & Services" > "Library"
+        #    - Search for "Google Sheets API" and enable it
         
-        3. **Create Credentials**:
-           - Go to "APIs & Services" > "Credentials"
-           - Click "Create Credentials" > "OAuth 2.0 Client IDs"
-           - Choose "Desktop application"
-           - Download the JSON file and rename it to `credentials.json`
-           - Place it in the same folder as this app
+        # 3. **Create Credentials**:
+        #    - Go to "APIs & Services" > "Credentials"
+        #    - Click "Create Credentials" > "OAuth 2.0 Client IDs"
+        #    - Choose "Desktop application"
+        #    - Download the JSON file and rename it to `credentials.json`
+        #    - Place it in the same folder as this app
         
-        4. **Create Google Sheet**:
-           - Create a new Google Sheet
-           - Copy the Spreadsheet ID from the URL
-           - Add the following headers in the first row:
-             - Date, Item, Quantity, Price, Total, Category, Notes
+        # 4. **Create Google Sheet**:
+        #    - Create a new Google Sheet
+        #    - Copy the Spreadsheet ID from the URL
+        #    - Add the following headers in the first row:
+        #      - Date, Item, Quantity, Price, Total, Category, Notes
         
-        5. **Configure the App**:
-           - Enter the Spreadsheet ID in the sidebar
-           - Set the sheet name (default: "Sales")
-           - Click "Load Data from Google Sheets"
+        # 5. **Configure the App**:
+        #    - Enter the Spreadsheet ID in the sidebar
+        #    - Set the sheet name (default: "Sales")
+        #    - Click "Load Data from Google Sheets"
         
-        ### File Structure
-        ```
-        your-project/
-        ├── app.py
-        ├── requirements.txt
-        ├── credentials.json
-        ├── item_prices.json
-        ├── token.pickle (will be created automatically)
-        └── README.md
-        ```
+        # ### File Structure
+        # ```
+        # your-project/
+        # ├── app.py
+        # ├── requirements.txt
+        # ├── credentials.json
+        # ├── item_prices.json
+        # ├── token.pickle (will be created automatically)
+        # └── README.md
+        # ```
         
-        ### 🔐 Price Management:
-        - Password: **bushman**
-        - Edit prices in the "Price Management" tab
-        - Changes are saved automatically
-        """)
+        # ### 🔐 Price Management:
+        # - Password: **bushman**
+        # - Edit prices in the "Price Management" tab
+        # - Changes are saved automatically
+        # """)
         
-        # Display current configuration
-        st.subheader("Current Configuration")
-        st.write(f"**Spreadsheet ID:** {st.session_state.spreadsheet_id or 'Not set'}")
-        st.write(f"**Sheet Name:** {st.session_state.sheet_name}")
-        st.write(f"**Credentials File:** {'✅ Found' if os.path.exists('credentials.json') else '❌ Missing'}")
-        st.write(f"**Token File:** {'✅ Found' if os.path.exists('token.pickle') else '❌ Not authenticated'}")
+        # # Display current configuration
+        # st.subheader("Current Configuration")
+        # st.write(f"**Spreadsheet ID:** {st.session_state.spreadsheet_id or 'Not set'}")
+        # st.write(f"**Sheet Name:** {st.session_state.sheet_name}")
+        # st.write(f"**Credentials File:** {'✅ Found' if os.path.exists('credentials.json') else '❌ Missing'}")
+        # st.write(f"**Token File:** {'✅ Found' if os.path.exists('token.pickle') else '❌ Not authenticated'}")
         
-        # Display item categories with prices
-        st.subheader("Item Categories and Prices")
-        for category, items in st.session_state.item_prices.items():
-            st.markdown(f"**{category}** ({len(items)} items):")
-            for item, price in items.items():
-                st.write(f"  - {item}: KSh {price:,}")
-            st.write("")
+        # # Display item categories with prices
+        # st.subheader("Item Categories and Prices")
+        # for category, items in st.session_state.item_prices.items():
+        #     st.markdown(f"**{category}** ({len(items)} items):")
+        #     for item, price in items.items():
+        #         st.write(f"  - {item}: KSh {price:,}")
+            # st.write("")
 
 if __name__ == "__main__":
     main() 
