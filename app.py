@@ -536,12 +536,19 @@ def main():
         col1, col2 = st.columns(2)
         
         with col1:
-            # Category selection with callback
+            # Category selection with callback - ensure all categories including Drinks are available
+            all_categories = sorted(list(st.session_state.item_prices.keys()))
+            try:
+                current_index = all_categories.index(st.session_state.bulk_selected_category)
+            except ValueError:
+                current_index = 0
+                st.session_state.bulk_selected_category = all_categories[0] if all_categories else "Snacks"
+            
             bulk_category = st.selectbox(
-                "Category", 
-                list(st.session_state.item_prices.keys()),
+                "Category",
+                all_categories,
                 key="bulk_category_select",
-                index=list(st.session_state.item_prices.keys()).index(st.session_state.bulk_selected_category)
+                index=current_index
             )
             
             # Update selected category when changed
@@ -700,24 +707,8 @@ def main():
                                 # Create row data matching the exact column structure
                                 row_data = []
                                 
-                                # Define the exact column order from the user's sheet
-                                exact_columns = [
-                                    'Date', 'chapo', 'Ndazi', 'Tm', 'cake', 'Hcake', 'Eggs', 'Omelet', 'Sausage/Smokie',
-                                    'ChapoMix', 'Walimix', 'Ugalimix', 'PilauMix', 'ChapoMinji', 'Waliminji', 
-                                    'Ugaliminji', 'PilauMinji', 'BeefChapo', 'BeefUgali', 'BeefRice', 'BeefPilau',
-                                    'KukuChapo', 'KukuUgali', 'KukuRice', 'KukuPilau', 'UgaliMatumbo', 'RiceMatumbo',
-                                    'ChapoMatumbo', 'PilauMatumbo', 'UgaliManagu', 'RiceManagu', 'ChapoManagu',
-                                    'PilauManagu', 'UgaliFryManagu', 'RiceFryManagu', 'ChapoFryManagu', 'PilauFryManagu',
-                                    'UgaliKukuManagu', 'RiceKukuManagu', 'ChapoKukuManagu', 'PilauKukuManagu',
-                                    'UgaliMatumboManagu', 'RiceMatumboManagu', 'ChapoMatumboManagu', 'PilauMatumboManagu',
-                                    'UgaliMboga', 'RiceMboga', 'ChapoMboga', 'UgaliPlain', 'MchelePlain', 'PilauPlain',
-                                    'ServiceNyama', 'Tea', 'BlackCoffee', 'WhiteCofee', 'LemonTea', 'Concusion',
-                                    'Predator', 'Soda', 'PlasticSoda', 'Dasani_.5ltr', 'Dasani_1ltr', 'Water_.5ltr',
-                                    'Water_1ltr', 'MinuteMaid', 'Amount'
-                                ]
-                                
-                                # Fill in data according to exact column structure
-                                for column in exact_columns:
+                                # Use the actual column headers from the sheet
+                                for column in column_headers:
                                     if column == 'Date':
                                         row_data.append(date_str)
                                     elif column == 'Amount':
@@ -731,10 +722,14 @@ def main():
                                                     break
                                         row_data.append(total_amount)
                                     else:
-                                        # This is an item column - check if the item name matches exactly
-                                        quantity = item_quantities.get(column, 0)
-                                        row_data.append(quantity)
-                                
+                                        # This is an item column - try to match item names (case-insensitive)
+                                        quantity = 0
+                                        for item, item_quantity in item_quantities.items():
+                                            # Check for exact match first, then case-insensitive match
+                                            if item == column or item.lower() == column.lower():
+                                                quantity = item_quantity
+                                                break
+                                        row_data.append(quantity)                                
                                 # Save the row to Google Sheets
                                 success = write_sales_data(
                                     st.session_state.spreadsheet_id,
@@ -791,15 +786,19 @@ def main():
                 )
             
             with col2:
+                # Ensure all categories are available in the filter, including Drinks
+                all_categories = sorted(list(st.session_state.item_prices.keys()))
                 category_filter = st.selectbox(
                     "Filter by Category",
-                    ["All"] + list(st.session_state.item_prices.keys())
+                    ["All"] + all_categories
                 )
             
             with col3:
                 all_items = []
-                for category_items in st.session_state.item_prices.values():
-                    all_items.extend(category_items.keys())
+                for category_name, category_items in st.session_state.item_prices.items():
+                    all_items.extend(list(category_items.keys()))
+                # Remove duplicates and sort
+                all_items = sorted(list(set(all_items)))
                 item_filter = st.selectbox(
                     "Filter by Item",
                     ["All"] + all_items
@@ -905,28 +904,43 @@ def main():
                 with col1:
                     # Sales by category
                     category_sales = filtered_df.groupby('Category')['Total'].sum().reset_index()
-                    fig_category = px.pie(
-                        category_sales,
-                        values='Total',
-                        names='Category',
-                        title='Sales by Category'
-                    )
-                    st.plotly_chart(fig_category, use_container_width=True)
+                    # Ensure all categories are included, even with zero sales
+                    all_categories = list(st.session_state.item_prices.keys())
+                    for category in all_categories:
+                        if category not in category_sales['Category'].values:
+                            new_row = pd.DataFrame({'Category': [category], 'Total': [0]})
+                            category_sales = pd.concat([category_sales, new_row], ignore_index=True)
+                    
+                    # Filter out categories with zero sales for cleaner visualization
+                    category_sales = category_sales[category_sales['Total'] > 0]
+                    
+                    if not category_sales.empty:
+                        fig_category = px.pie(
+                            category_sales,
+                            values='Total',
+                            names='Category',
+                            title='Sales by Category'
+                        )
+                        st.plotly_chart(fig_category, use_container_width=True)
+                    else:
+                        st.info("No sales data available for category breakdown.")
                 
                 with col2:
                     # Top 3 items per category
                     top_items_by_category = []
                     
-                    for category in filtered_df['Category'].unique():
+                    # Check all categories, not just those with sales
+                    for category in st.session_state.item_prices.keys():
                         category_data = filtered_df[filtered_df['Category'] == category]
-                        top_items = category_data.groupby('Item')['Quantity'].sum().sort_values(ascending=False).head(3)
-                        
-                        for item, quantity in top_items.items():
-                            top_items_by_category.append({
-                                'Category': category,
-                                'Item': item,
-                                'Quantity': quantity
-                            })
+                        if not category_data.empty:
+                            top_items = category_data.groupby('Item')['Quantity'].sum().sort_values(ascending=False).head(3)
+                            
+                            for item, quantity in top_items.items():
+                                top_items_by_category.append({
+                                    'Category': category,
+                                    'Item': item,
+                                    'Quantity': quantity
+                                })
                     
                     if top_items_by_category:
                         top_items_df = pd.DataFrame(top_items_by_category)
