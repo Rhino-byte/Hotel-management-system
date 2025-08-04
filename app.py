@@ -464,7 +464,7 @@ def main():
         with col1:
             if st.button("💾 Save Sales to Sheets"):
                 if st.session_state.sales_data:
-                    range_name = f"{PREDEFINED_SALES_SHEET}!A:AZ"
+                    range_name = f"{PREDEFINED_SALES_SHEET}!A:BN"
                     # This would need to be implemented based on your sheet format
                     st.info("Sales data saving to Google Sheets will be implemented based on your data format.")
                 else:
