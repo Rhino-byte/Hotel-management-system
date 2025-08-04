@@ -99,10 +99,10 @@ ITEM_PRICES = {
         "Water_.5ltr": 40,
         "Water_1ltr": 80,
         "MinuteMaid": 80
-    },
-    "No. cups of tea": {
-        "Tea": 30
-    }
+    }#,
+    # "No. cups of tea": {
+    #     "Tea": 30
+    # }
 }
 
 # Password for price editing
