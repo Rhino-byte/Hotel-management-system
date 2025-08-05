@@ -753,8 +753,8 @@ def main():
                     st.rerun()
             
             with col2:
-                if st.button("🗑️ Clear All Sales Entries"):
-                    st.session_state.bulk_entries = []
+                if st.button("🗑️ Clear last Sales Entries"):
+                    st.session_state.bulk_entries = st.session_state.bulk_entries[:-1]
                     st.rerun()
             
             with col3:
