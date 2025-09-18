@@ -1,4 +1,6 @@
-# 🏨 Hotel Management System
+ <img width="240" height="240" alt="image" src="https://github.com/user-attachments/assets/e89692d0-5b0a-4e92-9436-ba5a6d1e2af7" />
+ 
+ # Hotel Management System
 
 A comprehensive hotel management system built with Streamlit and Google Sheets integration for sales tracking, analytics, and price management.
 
@@ -23,6 +25,7 @@ A comprehensive hotel management system built with Streamlit and Google Sheets i
    - Select your repository
    - Set main file path: `app.py`
    - Click "Deploy"
+<img width="927" height="323" alt="image" src="https://github.com/user-attachments/assets/b54ba467-abb7-4281-9442-980a9037170c" />
 
 ### **Option 2: Heroku**
 
