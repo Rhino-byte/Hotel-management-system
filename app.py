@@ -10,6 +10,14 @@ from google_auth_oauthlib.flow import InstalledAppFlow
 from google.auth.transport.requests import Request
 from googleapiclient.discovery import build
 import pickle
+from core.pricing import (
+    find_item_category_and_price,
+    get_categories,
+    get_item_price,
+    get_items_for_category,
+    resolve_item_name,
+)
+from core.sales import build_sale_entry, build_sheet_row, group_entries_by_date_and_item
 
 # Google Sheets API scopes
 SCOPES = ['https://www.googleapis.com/auth/spreadsheets']
@@ -229,12 +237,9 @@ def read_sales_data(spreadsheet_id, range_name):
                             price = 0
                             category = ""
                             
-                            # Search for item in item_prices
-                            for cat, items in st.session_state.item_prices.items():
-                                if column in items:
-                                    price = items[column]
-                                    category = cat
-                                    break
+                            category, price = find_item_category_and_price(
+                                st.session_state.item_prices, column
+                            )
                             
                             # Create sales record
                             sales_records.append({
@@ -404,7 +409,16 @@ def initialize_session_state():
     if 'bulk_selected_category' not in st.session_state:
         st.session_state.bulk_selected_category = "Snacks"
     if 'bulk_selected_item' not in st.session_state:
-        st.session_state.bulk_selected_item = "Chapo"
+        st.session_state.bulk_selected_item = "chapo"
+    if "bulk_price" not in st.session_state:
+        st.session_state.bulk_price = float(
+            get_item_price(
+                st.session_state.item_prices,
+                st.session_state.bulk_selected_category,
+                st.session_state.bulk_selected_item,
+                default=0.0,
+            )
+        )
 
 def authenticate_price_edit():
     """Authenticate user for price editing"""
@@ -533,7 +547,7 @@ def main():
         
         with col1:
             # Category selection with callback - ensure all categories including Drinks are available
-            all_categories = sorted(list(st.session_state.item_prices.keys()))
+            all_categories = get_categories(st.session_state.item_prices)
             try:
                 current_index = all_categories.index(st.session_state.bulk_selected_category)
             except ValueError:
@@ -550,16 +564,29 @@ def main():
             # Update selected category when changed
             if bulk_category != st.session_state.bulk_selected_category:
                 st.session_state.bulk_selected_category = bulk_category
-                items_in_category = list(st.session_state.item_prices[bulk_category].keys())
+                items_in_category = get_items_for_category(st.session_state.item_prices, bulk_category)
                 st.session_state.bulk_selected_item = items_in_category[0] if items_in_category else ""
+                st.session_state.bulk_price = float(
+                    get_item_price(
+                        st.session_state.item_prices,
+                        st.session_state.bulk_selected_category,
+                        st.session_state.bulk_selected_item,
+                        default=0.0,
+                    )
+                )
         
         with col2:
             # Item selection based on category with callback
-            bulk_items = list(st.session_state.item_prices[bulk_category].keys())
+            bulk_items = get_items_for_category(st.session_state.item_prices, bulk_category)
             if bulk_items:
                 current_item_index = 0
-                if st.session_state.bulk_selected_item in bulk_items:
-                    current_item_index = bulk_items.index(st.session_state.bulk_selected_item)
+                resolved_selected_item = resolve_item_name(
+                    st.session_state.item_prices,
+                    bulk_category,
+                    st.session_state.bulk_selected_item,
+                )
+                if resolved_selected_item in bulk_items:
+                    current_item_index = bulk_items.index(resolved_selected_item)
                 
                 bulk_item = st.selectbox(
                     "Item", 
@@ -567,7 +594,16 @@ def main():
                     key=f"bulk_item_select_{bulk_category}",
                     index=current_item_index
                 )
-                st.session_state.bulk_selected_item = bulk_item
+                if bulk_item != st.session_state.bulk_selected_item:
+                    st.session_state.bulk_selected_item = bulk_item
+                    st.session_state.bulk_price = float(
+                        get_item_price(
+                            st.session_state.item_prices,
+                            bulk_category,
+                            bulk_item,
+                            default=0.0,
+                        )
+                    )
             else:
                 bulk_item = ""
                 st.warning("No items available in this category.")
@@ -590,10 +626,20 @@ def main():
                 
                 # Auto-fill price based on selected item
                 if bulk_item and bulk_category:
-                    bulk_selected_price = st.session_state.item_prices[bulk_category][bulk_item]
-                    bulk_price = st.number_input("Price per unit (KSh)", min_value=0.0, value=float(bulk_selected_price), step=1.0, key="bulk_price")
+                    bulk_price = st.number_input(
+                        "Price per unit (KSh)",
+                        min_value=0.0,
+                        step=1.0,
+                        key="bulk_price",
+                    )
                 else:
-                    bulk_price = st.number_input("Price per unit (KSh)", min_value=0.0, value=0.0, step=1.0, key="bulk_price")
+                    st.session_state.bulk_price = 0.0
+                    bulk_price = st.number_input(
+                        "Price per unit (KSh)",
+                        min_value=0.0,
+                        step=1.0,
+                        key="bulk_price",
+                    )
             
             with col4:
                 bulk_total = bulk_quantity * bulk_price
@@ -611,15 +657,14 @@ def main():
                     st.error("Please select an item.")
                 else:
                     # Create bulk entry record
-                    bulk_entry = {
-                        'Date': f"{bulk_date} 00:00:00",  # Use 00:00:00 for bulk entries
-                        'Item': bulk_item,
-                        'Quantity': bulk_quantity,
-                        'Price': bulk_price,
-                        'Total': bulk_total,
-                        'Category': bulk_category,
-                        'Notes': bulk_notes
-                    }
+                    bulk_entry = build_sale_entry(
+                        bulk_date,
+                        bulk_item,
+                        bulk_quantity,
+                        bulk_price,
+                        bulk_category,
+                        bulk_notes,
+                    )
                     
                     # Add to bulk entries
                     st.session_state.bulk_entries.append(bulk_entry)
@@ -683,49 +728,19 @@ def main():
                             column_headers = header_values[0]
                             
                             # Group entries by date and item
-                            date_item_quantities = {}
-                            for entry in st.session_state.bulk_entries:
-                                date_str = entry['Date'].split()[0]  # Get just the date part
-                                item = entry['Item']
-                                quantity = entry['Quantity']
-                                
-                                if date_str not in date_item_quantities:
-                                    date_item_quantities[date_str] = {}
-                                
-                                if item not in date_item_quantities[date_str]:
-                                    date_item_quantities[date_str][item] = 0
-                                
-                                date_item_quantities[date_str][item] += quantity
+                            date_item_quantities = group_entries_by_date_and_item(
+                                st.session_state.bulk_entries
+                            )
                             
                             # Save each date's data as a row
                             saved_count = 0
                             for date_str, item_quantities in date_item_quantities.items():
-                                # Create row data matching the exact column structure
-                                row_data = []
-                                
-                                # Use the actual column headers from the sheet
-                                for column in column_headers:
-                                    if column == 'Date':
-                                        row_data.append(date_str)
-                                    elif column == 'Amount':
-                                        # Calculate total amount for this date
-                                        total_amount = 0
-                                        for item, quantity in item_quantities.items():
-                                            # Find the price for this item
-                                            for category, items in st.session_state.item_prices.items():
-                                                if item in items:
-                                                    total_amount += quantity * items[item]
-                                                    break
-                                        row_data.append(total_amount)
-                                    else:
-                                        # This is an item column - try to match item names (case-insensitive)
-                                        quantity = 0
-                                        for item, item_quantity in item_quantities.items():
-                                            # Check for exact match first, then case-insensitive match
-                                            if item == column or item.lower() == column.lower():
-                                                quantity = item_quantity
-                                                break
-                                        row_data.append(quantity)                                
+                                row_data = build_sheet_row(
+                                    column_headers,
+                                    date_str,
+                                    item_quantities,
+                                    st.session_state.item_prices,
+                                )
                                 # Save the row to Google Sheets
                                 success = write_sales_data(
                                     st.session_state.spreadsheet_id,
