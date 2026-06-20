@@ -92,4 +92,24 @@ Login uses **first name + PIN** from existing `user_auth` (payroll unchanged).
 
 Hotel access is controlled by `employee.hotel_role`, except payroll `ADMIN` which gets full hotel access automatically.
 
-Assign roles via **Admin → Employees** in the UI, or `scripts/seed_hotel_roles.py`.
+### Assigning clerk roles (required before login)
+
+Employees without a hotel role (and who are not payroll `ADMIN`) cannot log in. An admin must assign roles first:
+
+1. Log in as payroll **ADMIN** or hotel **admin**.
+2. Open **Admin → Employees**.
+3. Search for the employee and choose a **Hotel role** from the dropdown:
+   - **Snacks Clerk** → Snacks & Drinks daily entry only
+   - **Food Clerk** → Food & Kuku daily entry only
+   - **Stock Clerk** → Stock Items daily entry only
+   - **Hotel Admin** → full access (prices, catalog, employees, audit)
+4. Click **Save** on that row.
+
+Alternatively, bulk-assign via `backend/scripts/seed_hotel_roles.py` (edit the mapping in the script first).
+
+| Hotel role | Dashboard | Audit access |
+|------------|-----------|--------------|
+| `snacks_clerk` | `/snacks-drinks` | Snacks & Drinks module only |
+| `food_clerk` | `/food-kuku` | Food & Kuku module only |
+| `stock_clerk` | `/stock-items` | Stock Items module only |
+| `admin` | All modules + admin tabs | All modules |

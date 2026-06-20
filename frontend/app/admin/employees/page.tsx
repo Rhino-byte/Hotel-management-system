@@ -5,6 +5,8 @@ import { fetchEmployees, updateEmployeeHotelRole } from "../../../lib/api";
 import { useRequireAuth } from "../../../lib/auth";
 import { HOTEL_ROLE_OPTIONS, type EmployeeRow } from "../../../lib/types";
 import LoadingScreen from "../../../components/LoadingScreen";
+import SaveButton from "../../../components/SaveButton";
+import SavingOverlay from "../../../components/SavingOverlay";
 
 export default function AdminEmployeesPage() {
   const { user, loading } = useRequireAuth(undefined, true);
@@ -12,6 +14,7 @@ export default function AdminEmployeesPage() {
   const [query, setQuery] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
+  const [savingId, setSavingId] = useState<number | null>(null);
 
   const load = () => {
     fetchEmployees()
@@ -27,12 +30,15 @@ export default function AdminEmployeesPage() {
   const onSave = async (employee: EmployeeRow, hotelRole: string) => {
     setError(null);
     setMessage(null);
+    setSavingId(employee.id);
     try {
       await updateEmployeeHotelRole(employee.id, hotelRole || null);
       setMessage(`Updated hotel role for ${employee.display_name}`);
       load();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Update failed");
+    } finally {
+      setSavingId(null);
     }
   };
 
@@ -44,7 +50,8 @@ export default function AdminEmployeesPage() {
 
   return (
     <main className="page">
-      <div className="card card-wide">
+      <div className={`card card-wide${savingId !== null ? " card-saving" : ""}`}>
+        {savingId !== null && <SavingOverlay />}
         <div className="page-header">
           <div>
             <h1 className="page-title">Employee Hotel Roles</h1>
@@ -82,7 +89,12 @@ export default function AdminEmployeesPage() {
             </thead>
             <tbody>
               {filtered.map((emp) => (
-                <EmployeeRoleRow key={emp.id} employee={emp} onSave={onSave} />
+                <EmployeeRoleRow
+                  key={emp.id}
+                  employee={emp}
+                  saving={savingId === emp.id}
+                  onSave={onSave}
+                />
               ))}
             </tbody>
           </table>
@@ -95,9 +107,11 @@ export default function AdminEmployeesPage() {
 
 function EmployeeRoleRow({
   employee,
+  saving,
   onSave,
 }: {
   employee: EmployeeRow;
+  saving: boolean;
   onSave: (employee: EmployeeRow, hotelRole: string) => void;
 }) {
   const [hotelRole, setHotelRole] = useState(employee.hotel_role || "");
@@ -127,13 +141,7 @@ function EmployeeRoleRow({
       <td>{employee.effective_hotel_role || (isPayrollAdmin ? "admin (payroll)" : "none")}</td>
       <td>
         {!isPayrollAdmin && (
-          <button
-            type="button"
-            className="btn btn-sm"
-            onClick={() => onSave(employee, hotelRole)}
-          >
-            Save
-          </button>
+          <SaveButton saving={saving} onClick={() => onSave(employee, hotelRole)} />
         )}
       </td>
     </tr>

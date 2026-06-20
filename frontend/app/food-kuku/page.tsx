@@ -2,6 +2,8 @@
 
 import { useEffect, useMemo, useState } from "react";
 import LoadingScreen from "../../components/LoadingScreen";
+import SaveButton from "../../components/SaveButton";
+import SavingOverlay from "../../components/SavingOverlay";
 import QuantityGrid from "../../components/QuantityGrid";
 import { fetchFoodKuku, saveFoodKuku, todayIso } from "../../lib/api";
 import { useRequireAuth } from "../../lib/auth";
@@ -60,7 +62,8 @@ export default function FoodKukuPage() {
 
   return (
     <main className="page">
-      <div className="card card-wide">
+      <div className={`card card-wide${saving ? " card-saving" : ""}`}>
+        {saving && <SavingOverlay />}
         <div className="page-header">
           <div>
             <h1 className="page-title">Food &amp; Kuku</h1>
@@ -88,9 +91,12 @@ export default function FoodKukuPage() {
           </button>
         </div>
         <QuantityGrid entries={filteredEntries} onChange={onChange} totalRevenue={filteredRevenue || totalRevenue} />
-        <button type="button" className="btn btn-primary" disabled={saving} onClick={onSave}>
-          {saving ? "Saving..." : "Save All"}
-        </button>
+        <SaveButton
+          saving={saving}
+          onClick={onSave}
+          label="Save All"
+          className="btn btn-primary"
+        />
       </div>
     </main>
   );

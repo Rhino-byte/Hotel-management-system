@@ -2,6 +2,8 @@
 
 import { useEffect, useState } from "react";
 import LoadingScreen from "../../components/LoadingScreen";
+import SaveButton from "../../components/SaveButton";
+import SavingOverlay from "../../components/SavingOverlay";
 import StockGrid from "../../components/StockGrid";
 import { fetchStockItems, saveStockItems, todayIso } from "../../lib/api";
 import { useRequireAuth } from "../../lib/auth";
@@ -52,7 +54,8 @@ export default function StockItemsPage() {
 
   return (
     <main className="page">
-      <div className="card">
+      <div className={`card${saving ? " card-saving" : ""}`}>
+        {saving && <SavingOverlay />}
         <div className="page-header">
           <div>
             <h1 className="page-title">Stock Items</h1>
@@ -82,9 +85,12 @@ export default function StockItemsPage() {
           </button>
         </div>
         <StockGrid entries={filteredEntries} onChange={onChange} />
-        <button type="button" className="btn btn-primary" disabled={saving} onClick={onSave}>
-          {saving ? "Saving..." : "Save All"}
-        </button>
+        <SaveButton
+          saving={saving}
+          onClick={onSave}
+          label="Save All"
+          className="btn btn-primary"
+        />
       </div>
     </main>
   );

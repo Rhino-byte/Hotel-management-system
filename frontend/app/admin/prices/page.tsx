@@ -5,6 +5,8 @@ import { fetchPrices, updatePrice } from "../../../lib/api";
 import { useRequireAuth } from "../../../lib/auth";
 import type { PriceItem } from "../../../lib/types";
 import LoadingScreen from "../../../components/LoadingScreen";
+import SaveButton from "../../../components/SaveButton";
+import SavingOverlay from "../../../components/SavingOverlay";
 
 export default function AdminPricesPage() {
   const { user, loading } = useRequireAuth(undefined, true);
@@ -12,6 +14,7 @@ export default function AdminPricesPage() {
   const [query, setQuery] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
+  const [savingId, setSavingId] = useState<number | null>(null);
 
   useEffect(() => {
     if (loading || !user || user.role !== "admin") return;
@@ -27,6 +30,7 @@ export default function AdminPricesPage() {
   const onSave = async (item: PriceItem, newPrice: number) => {
     setError(null);
     setMessage(null);
+    setSavingId(item.id);
     try {
       await updatePrice(item.id, newPrice);
       setItems((prev) =>
@@ -35,12 +39,15 @@ export default function AdminPricesPage() {
       setMessage(`Updated price for ${item.name}`);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Update failed");
+    } finally {
+      setSavingId(null);
     }
   };
 
   return (
     <main className="page">
-      <div className="card card-wide">
+      <div className={`card card-wide${savingId !== null ? " card-saving" : ""}`}>
+        {savingId !== null && <SavingOverlay />}
         <div className="page-header">
           <div>
             <h1 className="page-title">Price Management</h1>
@@ -75,7 +82,12 @@ export default function AdminPricesPage() {
             </thead>
             <tbody>
               {filtered.map((item) => (
-                <PriceRow key={item.id} item={item} onSave={onSave} />
+                <PriceRow
+                  key={item.id}
+                  item={item}
+                  saving={savingId === item.id}
+                  onSave={onSave}
+                />
               ))}
             </tbody>
           </table>
@@ -88,9 +100,11 @@ export default function AdminPricesPage() {
 
 function PriceRow({
   item,
+  saving,
   onSave,
 }: {
   item: PriceItem;
+  saving: boolean;
   onSave: (item: PriceItem, price: number) => void;
 }) {
   const [price, setPrice] = useState(item.price_ksh);
@@ -111,14 +125,11 @@ function PriceRow({
         />
       </td>
       <td>
-        <button
-          type="button"
-          className="btn btn-sm"
-          onClick={() => onSave(item, price)}
+        <SaveButton
+          saving={saving}
           disabled={price <= 0}
-        >
-          Save
-        </button>
+          onClick={() => onSave(item, price)}
+        />
       </td>
     </tr>
   );

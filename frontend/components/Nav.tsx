@@ -17,6 +17,8 @@ const ADMIN_LINKS = [
   { href: "/admin/audit", label: "Audit" },
 ];
 
+const CLERK_AUDIT_LINK = { href: "/admin/audit", label: "Audit" };
+
 export default function Nav() {
   const { user, logout } = useAuth();
   const pathname = usePathname();
@@ -24,6 +26,7 @@ export default function Nav() {
   if (!user || pathname === "/login") return null;
 
   const isAdmin = user.role === "admin";
+  const showClerkAudit = !isAdmin && user.modules.length > 0;
 
   return (
     <header className="nav">
@@ -41,6 +44,16 @@ export default function Nav() {
               {l.label}
             </Link>
           ))}
+          {showClerkAudit && (
+            <Link
+              href={CLERK_AUDIT_LINK.href}
+              className={
+                pathname.startsWith(CLERK_AUDIT_LINK.href) ? "nav-link active" : "nav-link"
+              }
+            >
+              {CLERK_AUDIT_LINK.label}
+            </Link>
+          )}
           {isAdmin &&
             ADMIN_LINKS.map((l) => (
               <Link

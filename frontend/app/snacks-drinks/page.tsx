@@ -2,6 +2,8 @@
 
 import { useEffect, useState } from "react";
 import LoadingScreen from "../../components/LoadingScreen";
+import SaveButton from "../../components/SaveButton";
+import SavingOverlay from "../../components/SavingOverlay";
 import StockGrid from "../../components/StockGrid";
 import {
   fetchSnacksDrinks,
@@ -62,12 +64,14 @@ export default function SnacksDrinksPage() {
 
   return (
     <main className="page">
-      <div className="card">
+      <div className={`card${saving ? " card-saving" : ""}`}>
+        {saving && <SavingOverlay />}
         <div className="page-header">
           <div>
             <h1 className="page-title">Snacks &amp; Drinks</h1>
             <p className="page-subtitle">
-              Record closing and added stock per item. Missing added stock defaults to zero.
+              Enter today&apos;s closing and added stock. Sold units and revenue use
+              (closing + added) minus tomorrow&apos;s closing count.
             </p>
           </div>
         </div>
@@ -101,10 +105,13 @@ export default function SnacksDrinksPage() {
             Reset
           </button>
         </div>
-        <StockGrid entries={filteredEntries} onChange={onChange} />
-        <button type="button" className="btn btn-primary" disabled={saving} onClick={onSave}>
-          {saving ? "Saving..." : "Save All"}
-        </button>
+        <StockGrid entries={filteredEntries} onChange={onChange} showRevenue />
+        <SaveButton
+          saving={saving}
+          onClick={onSave}
+          label="Save All"
+          className="btn btn-primary"
+        />
       </div>
     </main>
   );

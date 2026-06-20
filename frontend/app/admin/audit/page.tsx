@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { fetchInventoryAudit, todayIso } from "../../../lib/api";
 import { useRequireAuth } from "../../../lib/auth";
 import type { AuditRow } from "../../../lib/types";
@@ -13,14 +13,28 @@ const GROUPS = [
   { value: "stock", label: "Stock Items" },
 ];
 
+function defaultAuditGroup(modules: string[]): string {
+  if (modules.includes("snacks_drinks")) return "snacks_drinks";
+  if (modules.includes("food_kuku")) return "food_kuku";
+  if (modules.includes("stock_items")) return "stock";
+  return "snacks_drinks";
+}
+
 export default function AdminAuditPage() {
   const { user, loading } = useRequireAuth();
   const [group, setGroup] = useState("snacks_drinks");
+  const [groupInitialized, setGroupInitialized] = useState(false);
   const [dateFrom, setDateFrom] = useState(todayIso());
   const [dateTo, setDateTo] = useState(todayIso());
   const [rows, setRows] = useState<AuditRow[]>([]);
   const [query, setQuery] = useState("");
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (loading || !user || groupInitialized) return;
+    setGroup(defaultAuditGroup(user.modules));
+    setGroupInitialized(true);
+  }, [loading, user, groupInitialized]);
 
   const onLoad = async () => {
     setError(null);
@@ -55,7 +69,9 @@ export default function AdminAuditPage() {
           <div>
             <h1 className="page-title">Inventory Audit</h1>
             <p className="page-subtitle">
-              Review daily records for auditing. Opening stock equals previous day closing.
+              {isSnacksGroup
+                ? "Snacks revenue = (closing + added) − next-day closing. Prev. day closing tracks stock continuity."
+                : "Review daily records. Opening equals previous day closing."}
             </p>
           </div>
         </div>
@@ -100,16 +116,17 @@ export default function AdminAuditPage() {
                 <th>Item</th>
                 {isSnacksGroup ? (
                   <>
-                    <th>Opening</th>
-                    <th>Added</th>
+                    <th>Prev. Day Closing</th>
                     <th>Closing</th>
+                    <th>Added</th>
+                    <th>Next-day Closing</th>
                     <th>Price</th>
                     <th>Sold Units</th>
                     <th>Revenue</th>
                   </>
                 ) : isStockGroup ? (
                   <>
-                    <th>Opening</th>
+                    <th>Prev. Day Closing</th>
                     <th>Added</th>
                     <th>Closing</th>
                   </>
@@ -130,8 +147,9 @@ export default function AdminAuditPage() {
                   {isSnacksGroup ? (
                     <>
                       <td>{r.opening_stock ?? 0}</td>
-                      <td>{r.added_stock ?? 0}</td>
                       <td>{r.closing_stock ?? 0}</td>
+                      <td>{r.added_stock ?? 0}</td>
+                      <td>{r.next_closing_units ?? 0}</td>
                       <td>{Number(r.price_ksh ?? 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
                       <td>{r.sold_units ?? 0}</td>
                       <td>{(r.revenue ?? 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>

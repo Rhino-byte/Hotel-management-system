@@ -46,13 +46,22 @@ def create_stock_item(name: str, user_id: Optional[int] = None) -> dict[str, Any
             (name,),
         ).fetchone()
         item = dict(row)
-        conn.execute(
+        existing_price = conn.execute(
             """
-            INSERT INTO item_prices (item_id, price_ksh, updated_by)
-            VALUES (%s, 0, %s)
+            SELECT id FROM item_prices
+            WHERE item_id = %s
+            LIMIT 1
             """,
-            (item["id"], user_id),
-        )
+            (item["id"],),
+        ).fetchone()
+        if not existing_price:
+            conn.execute(
+                """
+                INSERT INTO item_prices (item_id, price_ksh, updated_by)
+                VALUES (%s, 0, %s)
+                """,
+                (item["id"], user_id),
+            )
         conn.commit()
         return item
 

@@ -5,9 +5,10 @@ import type { StockEntry } from "../lib/types";
 type Props = {
   entries: StockEntry[];
   onChange: (itemId: number, field: "closing_stock" | "added_stock", value: number) => void;
+  showRevenue?: boolean;
 };
 
-export default function StockGrid({ entries, onChange }: Props) {
+export default function StockGrid({ entries, onChange, showRevenue = false }: Props) {
   return (
     <div className="table-wrap">
       <table className="data-table">
@@ -16,11 +17,14 @@ export default function StockGrid({ entries, onChange }: Props) {
             <th>Item</th>
             <th>Closing Stock</th>
             <th>Added Stock</th>
-            <th>Opening Units</th>
-            <th>Next Day Closing</th>
-            <th>Sold Units</th>
-            <th>Price</th>
-            <th>Revenue</th>
+            {showRevenue && (
+              <>
+                <th>Tomorrow Closing</th>
+                <th>Sold Units</th>
+                <th>Price</th>
+                <th>Revenue</th>
+              </>
+            )}
           </tr>
         </thead>
         <tbody>
@@ -51,11 +55,14 @@ export default function StockGrid({ entries, onChange }: Props) {
                   }
                 />
               </td>
-              <td>{Number(row.opening_units ?? 0).toLocaleString()}</td>
-              <td>{Number(row.next_closing_units ?? 0).toLocaleString()}</td>
-              <td>{Number(row.sold_units ?? 0).toLocaleString()}</td>
-              <td>{Number(row.price_ksh ?? 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
-              <td>{Number(row.revenue ?? 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+              {showRevenue && (
+                <>
+                  <td>{Number(row.next_closing_units ?? 0).toLocaleString()}</td>
+                  <td>{Number(row.sold_units ?? 0).toLocaleString()}</td>
+                  <td>{Number(row.price_ksh ?? 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                  <td>{Number(row.revenue ?? 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                </>
+              )}
             </tr>
           ))}
         </tbody>

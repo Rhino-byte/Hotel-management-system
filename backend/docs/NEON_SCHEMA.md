@@ -33,7 +33,16 @@ Added by migration `002_employee_hotel_role.sql`.
 | `employee.hotel_role = food_clerk` | Food & Kuku |
 | `employee.hotel_role = stock_clerk` | Stock Items |
 | `employee.hotel_role = admin` | Full hotel admin |
-| No `hotel_role` and not payroll ADMIN | No hotel access |
+| No `hotel_role` and not payroll ADMIN | No hotel access — login blocked |
+
+## Clerk onboarding
+
+Before a clerk can use the hotel app, assign `employee.hotel_role`:
+
+1. **UI:** Admin → Employees → select role → Save (see project [README](../../README.md#assigning-clerk-roles-required-before-login)).
+2. **Script:** `python scripts/seed_hotel_roles.py` with a first-name → role map.
+
+Clerks see only their module tab plus **Audit** (scoped to their module). Payroll `ADMIN` users get full hotel admin without setting `hotel_role`.
 
 ## Hotel tables (migration 001)
 
