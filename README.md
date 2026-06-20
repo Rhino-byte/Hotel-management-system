@@ -1,94 +1,95 @@
- <img width="240" height="240" alt="image" src="https://github.com/user-attachments/assets/e89692d0-5b0a-4e92-9436-ba5a6d1e2af7" />
- 
- # Hotel Management System
+# Hotel Management System
 
-A comprehensive hotel management system built with Streamlit and Google Sheets integration for sales tracking, analytics, and price management.
+Daily stock and sales tracking for hotel operations, backed by **Neon PostgreSQL**, with a **FastAPI** backend on **Render** and a **Next.js** frontend on **Vercel**.
 
-## 🚀 **Deployment Instructions**
+## Architecture
 
-### **Option 1: Streamlit Cloud (Recommended)**
+```
+Hotel-management-system/
+├── backend/          # FastAPI API, db layer, migrations, scripts
+└── frontend/         # Next.js UI
+```
 
-1. **Push to GitHub:**
-   ```bash
-   git init
-   git add .
-   git commit -m "Initial commit"
-   git branch -M main
-   git remote add origin https://github.com/YOUR_USERNAME/YOUR_REPO_NAME.git
-   git push -u origin main
-   ```
+- **Frontend (Vercel):** `frontend/` — role-gated daily entry UI
+- **API (Render):** `backend/app/` — JWT auth, CRUD for three modules
+- **Database (Neon):** existing `users` table + items, prices, daily records, audit log
 
-2. **Deploy on Streamlit Cloud:**
-   - Go to [share.streamlit.io](https://share.streamlit.io)
-   - Sign in with GitHub
-   - Click "New app"
-   - Select your repository
-   - Set main file path: `app.py`
-   - Click "Deploy"
-<img width="927" height="323" alt="image" src="https://github.com/user-attachments/assets/b54ba467-abb7-4281-9442-980a9037170c" />
+## Modules
 
-### **Option 2: Heroku**
+| Module | Role | Data collected |
+|--------|------|----------------|
+| Snacks & Drinks | `snacks_clerk`, `admin` | Closing stock + added stock per item/day |
+| Food & Kuku | `food_clerk`, `admin` | Quantity sold per dish/day |
+| Stock Items | `stock_clerk`, `admin` | Raw material closing + added stock |
+| Admin | `admin` | Prices, stock catalog, audit views |
 
-1. **Create Procfile:**
-   ```
-   web: streamlit run app.py --server.port=$PORT --server.address=0.0.0.0
-   ```
+## Quick start (local)
 
-2. **Deploy:**
-   ```bash
-   heroku create your-app-name
-   git push heroku main
-   ```
+### 1. Database
 
-### **Option 3: Railway**
-
-1. **Create railway.toml:**
-   ```toml
-   [build]
-   builder = "nixpacks"
-
-   [deploy]
-   startCommand = "streamlit run app.py --server.port=$PORT --server.address=0.0.0.0"
-   ```
-
-2. **Deploy via Railway dashboard**
-
-## 📋 **Features**
-
-- **📝 Sales Data Entry**: Bulk entry system for daily sales
-- **📋 Current Sales**: View and filter sales data
-- **📊 Analytics**: Date-filtered analytics with charts
-- **💰 Price Management**: Password-protected price editing
-- **🔗 Google Sheets Integration**: Real-time data sync
-
-## ⚙️ **Setup**
-
-### **Local Development:**
 ```bash
+cd backend
+cp .env.example .env
+# Set DATABASE_URL to your Neon connection string
+
 pip install -r requirements.txt
-streamlit run app.py
+python scripts/run_migrations.py
+python scripts/seed_items_and_prices.py
 ```
 
-### **Google Sheets Setup:**
-1. Create Google Cloud Project
-2. Enable Google Sheets API
-3. Create OAuth 2.0 credentials
-4. Download `credentials.json`
-5. Place in project root
+See [backend/docs/NEON_SCHEMA.md](backend/docs/NEON_SCHEMA.md) for user table requirements.
 
-## 🔐 **Security**
-- Price editing password: `bushman`
-- Google Sheets authentication required
+### 2. API
 
-## 📁 **File Structure**
-```
-├── app.py                 # Main application
-├── requirements.txt       # Python dependencies
-├── credentials.json       # Google API credentials
-├── .streamlit/config.toml # Streamlit configuration
-└── README.md             # This file
+```bash
+cd backend
+uvicorn app.main:app --reload --port 8000
 ```
 
-## 🌐 **Access**
-- **Local**: http://localhost:8501
-- **Deployed**: Your deployment URL 
+### 3. Frontend
+
+```bash
+cd frontend
+cp .env.example .env
+npm install
+npm run dev
+```
+
+Open http://localhost:3000
+
+## Deployment
+
+See [DEPLOYMENT.md](DEPLOYMENT.md) for Render + Vercel setup.
+
+## Project structure
+
+```
+backend/
+├── app/
+│   ├── main.py           # FastAPI entrypoint
+│   ├── security.py       # JWT + bcrypt
+│   ├── deps.py           # Auth dependencies
+│   ├── routers/          # Route handlers by domain
+│   └── schemas/          # Pydantic request/response models
+├── db/                   # PostgreSQL access layer
+├── core/                 # Catalog, roles, pricing helpers
+├── migrations/
+├── scripts/
+└── render.yaml
+
+frontend/
+├── app/                  # Next.js routes
+├── components/           # Shared UI
+└── lib/
+    ├── api/              # API client by domain
+    ├── auth.tsx          # Auth context
+    └── types.ts
+```
+
+## User roles
+
+Login uses **first name + PIN** from existing `user_auth` (payroll unchanged).
+
+Hotel access is controlled by `employee.hotel_role`, except payroll `ADMIN` which gets full hotel access automatically.
+
+Assign roles via **Admin → Employees** in the UI, or `scripts/seed_hotel_roles.py`.

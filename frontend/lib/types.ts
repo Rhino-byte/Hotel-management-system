@@ -1,0 +1,71 @@
+export type User = {
+  id: number;
+  first_name: string;
+  display_name: string;
+  payroll_role: string;
+  hotel_role: string | null;
+  role: string;
+  modules: string[];
+  default_route: string;
+};
+
+export type EmployeeRow = {
+  id: number;
+  first_name: string;
+  last_name: string;
+  display_name: string;
+  payroll_role: string;
+  hotel_role: string | null;
+  effective_hotel_role: string | null;
+};
+
+export type StockEntry = {
+  item_id: number;
+  name: string;
+  closing_stock: number;
+  added_stock: number;
+  opening_units?: number;
+  next_closing_units?: number;
+  sold_units?: number;
+  price_ksh?: number;
+  revenue?: number;
+  record_id?: number | null;
+};
+
+export type QuantityEntry = {
+  item_id: number;
+  name: string;
+  quantity: number;
+  price_ksh: number;
+  record_id?: number | null;
+};
+
+export type PriceItem = {
+  id: number;
+  name: string;
+  group_type: string;
+  price_ksh: number;
+  price_id?: number | null;
+};
+
+export type AuditRow = {
+  item_id: number;
+  item_name: string;
+  entry_date: string;
+  opening_stock?: number;
+  closing_stock?: number;
+  added_stock?: number;
+  next_closing_units?: number;
+  sold_units?: number;
+  quantity?: number;
+  price_ksh?: number;
+  revenue?: number;
+};
+
+export const HOTEL_ROLE_OPTIONS = [
+  { value: "", label: "None" },
+  { value: "snacks_clerk", label: "Snacks Clerk" },
+  { value: "food_clerk", label: "Food Clerk" },
+  { value: "stock_clerk", label: "Stock Clerk" },
+  { value: "admin", label: "Hotel Admin" },
+];

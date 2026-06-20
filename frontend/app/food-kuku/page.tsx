@@ -1,0 +1,97 @@
+"use client";
+
+import { useEffect, useMemo, useState } from "react";
+import LoadingScreen from "../../components/LoadingScreen";
+import QuantityGrid from "../../components/QuantityGrid";
+import { fetchFoodKuku, saveFoodKuku, todayIso } from "../../lib/api";
+import { useRequireAuth } from "../../lib/auth";
+import type { QuantityEntry } from "../../lib/types";
+
+export default function FoodKukuPage() {
+  const { user, loading } = useRequireAuth(["food_kuku"]);
+  const [date, setDate] = useState(todayIso());
+  const [query, setQuery] = useState("");
+  const [entries, setEntries] = useState<QuantityEntry[]>([]);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [message, setMessage] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (loading || !user) return;
+    setError(null);
+    fetchFoodKuku(date)
+      .then((d) => setEntries(d.entries))
+      .catch((e) => setError(e.message));
+  }, [date, loading, user]);
+
+  const totalRevenue = useMemo(
+    () => entries.reduce((sum, e) => sum + e.quantity * e.price_ksh, 0),
+    [entries]
+  );
+
+  const onChange = (itemId: number, quantity: number) => {
+    setEntries((prev) =>
+      prev.map((e) => (e.item_id === itemId ? { ...e, quantity } : e))
+    );
+  };
+
+  const onSave = async () => {
+    setSaving(true);
+    setError(null);
+    setMessage(null);
+    try {
+      const res = await saveFoodKuku(date, entries);
+      setMessage(
+        `Saved ${res.saved} items. Revenue: KSh ${res.total_revenue.toLocaleString(undefined, { minimumFractionDigits: 2 })}`
+      );
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Save failed");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  if (loading) return <LoadingScreen />;
+
+  const filteredEntries = entries.filter((e) =>
+    e.name.toLowerCase().includes(query.trim().toLowerCase())
+  );
+  const filteredRevenue = filteredEntries.reduce((sum, e) => sum + e.quantity * e.price_ksh, 0);
+
+  return (
+    <main className="page">
+      <div className="card card-wide">
+        <div className="page-header">
+          <div>
+            <h1 className="page-title">Food &amp; Kuku</h1>
+            <p className="page-subtitle">Enter quantity sold per dish. Unset items default to zero.</p>
+          </div>
+        </div>
+        {error && <div className="alert error">{error}</div>}
+        {message && <div className="alert success">{message}</div>}
+        <div className="filters">
+          <label className="field">
+            <span>Date</span>
+            <input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
+          </label>
+          <label className="field">
+            <span>Search dish</span>
+            <input
+              type="text"
+              value={query}
+              placeholder="Type dish name..."
+              onChange={(e) => setQuery(e.target.value)}
+            />
+          </label>
+          <button type="button" className="btn btn-secondary" onClick={() => setQuery("")}>
+            Reset
+          </button>
+        </div>
+        <QuantityGrid entries={filteredEntries} onChange={onChange} totalRevenue={filteredRevenue || totalRevenue} />
+        <button type="button" className="btn btn-primary" disabled={saving} onClick={onSave}>
+          {saving ? "Saving..." : "Save All"}
+        </button>
+      </div>
+    </main>
+  );
+}

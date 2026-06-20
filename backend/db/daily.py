@@ -1,0 +1,496 @@
+from datetime import date
+from typing import Any, Optional
+
+from db.connection import get_conn
+
+
+def log_audit(
+    conn,
+    *,
+    table_name: str,
+    record_id: int,
+    item_id: Optional[int],
+    entry_date: Optional[date],
+    field_name: str,
+    old_value: Any,
+    new_value: Any,
+    changed_by: int,
+) -> None:
+    conn.execute(
+        """
+        INSERT INTO inventory_audit_log
+          (table_name, record_id, item_id, entry_date, field_name, old_value, new_value, changed_by)
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+        """,
+        (
+            table_name,
+            record_id,
+            item_id,
+            entry_date,
+            field_name,
+            None if old_value is None else str(old_value),
+            str(new_value),
+            changed_by,
+        ),
+    )
+
+
+def get_snacks_drinks_daily(entry_date: date) -> list[dict[str, Any]]:
+    with get_conn() as conn:
+        rows = conn.execute(
+            """
+            SELECT i.id AS item_id, i.name,
+                   COALESCE(d.closing_stock, 0) AS closing_stock,
+                   COALESCE(d.added_stock, 0) AS added_stock,
+                   COALESCE(n.closing_stock, 0) AS next_closing_units,
+                   COALESCE(
+                     (SELECT ip.price_ksh FROM item_prices ip
+                      WHERE ip.item_id = i.id
+                      ORDER BY ip.effective_from DESC, ip.id DESC
+                      LIMIT 1),
+                     0
+                   ) AS price_ksh,
+                   d.id AS record_id
+            FROM items i
+            LEFT JOIN snacks_drinks_daily d
+              ON d.item_id = i.id AND d.entry_date = %s
+            LEFT JOIN snacks_drinks_daily n
+              ON n.item_id = i.id AND n.entry_date = (%s::date + INTERVAL '1 day')::date
+            WHERE i.group_type = 'snacks_drinks' AND i.is_active = TRUE
+            ORDER BY i.name
+            """,
+            (entry_date, entry_date),
+        ).fetchall()
+        result: list[dict[str, Any]] = []
+        for row in rows:
+            record = dict(row)
+            opening_units = float(record["closing_stock"]) + float(record["added_stock"])
+            next_closing_units = float(record["next_closing_units"])
+            sold_units = max(opening_units - next_closing_units, 0.0)
+            price_ksh = float(record["price_ksh"])
+            record["opening_units"] = opening_units
+            record["sold_units"] = sold_units
+            record["revenue"] = sold_units * price_ksh
+            result.append(record)
+        return result
+
+
+def save_snacks_drinks_daily(
+    entry_date: date, entries: list[dict[str, Any]], user_id: int
+) -> int:
+    saved = 0
+    with get_conn() as conn:
+        for entry in entries:
+            item_id = int(entry["item_id"])
+            closing = float(entry.get("closing_stock") or 0)
+            added = float(entry.get("added_stock") or 0)
+            existing = conn.execute(
+                """
+                SELECT id, closing_stock, added_stock
+                FROM snacks_drinks_daily
+                WHERE entry_date = %s AND item_id = %s
+                """,
+                (entry_date, item_id),
+            ).fetchone()
+            if existing:
+                record_id = existing["id"]
+                if float(existing["closing_stock"]) != closing:
+                    log_audit(
+                        conn,
+                        table_name="snacks_drinks_daily",
+                        record_id=record_id,
+                        item_id=item_id,
+                        entry_date=entry_date,
+                        field_name="closing_stock",
+                        old_value=existing["closing_stock"],
+                        new_value=closing,
+                        changed_by=user_id,
+                    )
+                if float(existing["added_stock"]) != added:
+                    log_audit(
+                        conn,
+                        table_name="snacks_drinks_daily",
+                        record_id=record_id,
+                        item_id=item_id,
+                        entry_date=entry_date,
+                        field_name="added_stock",
+                        old_value=existing["added_stock"],
+                        new_value=added,
+                        changed_by=user_id,
+                    )
+                conn.execute(
+                    """
+                    UPDATE snacks_drinks_daily
+                    SET closing_stock = %s, added_stock = %s,
+                        submitted_by = %s, submitted_at = NOW()
+                    WHERE id = %s
+                    """,
+                    (closing, added, user_id, record_id),
+                )
+            else:
+                row = conn.execute(
+                    """
+                    INSERT INTO snacks_drinks_daily
+                      (entry_date, item_id, closing_stock, added_stock, submitted_by)
+                    VALUES (%s, %s, %s, %s, %s)
+                    RETURNING id
+                    """,
+                    (entry_date, item_id, closing, added, user_id),
+                ).fetchone()
+                record_id = row["id"]
+                for field, val in [("closing_stock", closing), ("added_stock", added)]:
+                    log_audit(
+                        conn,
+                        table_name="snacks_drinks_daily",
+                        record_id=record_id,
+                        item_id=item_id,
+                        entry_date=entry_date,
+                        field_name=field,
+                        old_value=None,
+                        new_value=val,
+                        changed_by=user_id,
+                    )
+            saved += 1
+        conn.commit()
+    return saved
+
+
+def get_food_kuku_daily(entry_date: date) -> list[dict[str, Any]]:
+    with get_conn() as conn:
+        rows = conn.execute(
+            """
+            SELECT i.id AS item_id, i.name,
+                   COALESCE(d.quantity, 0) AS quantity,
+                   COALESCE(
+                     (SELECT ip.price_ksh FROM item_prices ip
+                      WHERE ip.item_id = i.id
+                      ORDER BY ip.effective_from DESC, ip.id DESC
+                      LIMIT 1),
+                     0
+                   ) AS price_ksh,
+                   d.id AS record_id
+            FROM items i
+            LEFT JOIN food_kuku_daily d
+              ON d.item_id = i.id AND d.entry_date = %s
+            WHERE i.group_type = 'food_kuku' AND i.is_active = TRUE
+            ORDER BY i.name
+            """,
+            (entry_date,),
+        ).fetchall()
+        return [dict(r) for r in rows]
+
+
+def save_food_kuku_daily(
+    entry_date: date, entries: list[dict[str, Any]], user_id: int
+) -> dict[str, Any]:
+    saved = 0
+    total_revenue = 0.0
+    with get_conn() as conn:
+        for entry in entries:
+            item_id = int(entry["item_id"])
+            quantity = float(entry.get("quantity") or 0)
+            price_row = conn.execute(
+                """
+                SELECT COALESCE(
+                  (SELECT ip.price_ksh FROM item_prices ip
+                   WHERE ip.item_id = %s
+                   ORDER BY ip.effective_from DESC, ip.id DESC
+                   LIMIT 1),
+                  0
+                ) AS price_ksh
+                """,
+                (item_id,),
+            ).fetchone()
+            price = float(price_row["price_ksh"])
+            total_revenue += quantity * price
+            existing = conn.execute(
+                """
+                SELECT id, quantity FROM food_kuku_daily
+                WHERE entry_date = %s AND item_id = %s
+                """,
+                (entry_date, item_id),
+            ).fetchone()
+            if existing:
+                record_id = existing["id"]
+                if float(existing["quantity"]) != quantity:
+                    log_audit(
+                        conn,
+                        table_name="food_kuku_daily",
+                        record_id=record_id,
+                        item_id=item_id,
+                        entry_date=entry_date,
+                        field_name="quantity",
+                        old_value=existing["quantity"],
+                        new_value=quantity,
+                        changed_by=user_id,
+                    )
+                conn.execute(
+                    """
+                    UPDATE food_kuku_daily
+                    SET quantity = %s, submitted_by = %s, submitted_at = NOW()
+                    WHERE id = %s
+                    """,
+                    (quantity, user_id, record_id),
+                )
+            else:
+                row = conn.execute(
+                    """
+                    INSERT INTO food_kuku_daily
+                      (entry_date, item_id, quantity, submitted_by)
+                    VALUES (%s, %s, %s, %s)
+                    RETURNING id
+                    """,
+                    (entry_date, item_id, quantity, user_id),
+                ).fetchone()
+                log_audit(
+                    conn,
+                    table_name="food_kuku_daily",
+                    record_id=row["id"],
+                    item_id=item_id,
+                    entry_date=entry_date,
+                    field_name="quantity",
+                    old_value=None,
+                    new_value=quantity,
+                    changed_by=user_id,
+                )
+            saved += 1
+        conn.commit()
+    return {"saved": saved, "total_revenue": total_revenue}
+
+
+def get_stock_items_daily(entry_date: date) -> list[dict[str, Any]]:
+    with get_conn() as conn:
+        rows = conn.execute(
+            """
+            SELECT i.id AS item_id, i.name,
+                   COALESCE(d.closing_stock, 0) AS closing_stock,
+                   COALESCE(d.added_stock, 0) AS added_stock,
+                   d.id AS record_id
+            FROM items i
+            LEFT JOIN stock_items_daily d
+              ON d.item_id = i.id AND d.entry_date = %s
+            WHERE i.group_type = 'stock' AND i.is_active = TRUE
+            ORDER BY i.name
+            """,
+            (entry_date,),
+        ).fetchall()
+        return [dict(r) for r in rows]
+
+
+def save_stock_items_daily(
+    entry_date: date, entries: list[dict[str, Any]], user_id: int
+) -> int:
+    saved = 0
+    with get_conn() as conn:
+        for entry in entries:
+            item_id = int(entry["item_id"])
+            closing = float(entry.get("closing_stock") or 0)
+            added = float(entry.get("added_stock") or 0)
+            existing = conn.execute(
+                """
+                SELECT id, closing_stock, added_stock
+                FROM stock_items_daily
+                WHERE entry_date = %s AND item_id = %s
+                """,
+                (entry_date, item_id),
+            ).fetchone()
+            if existing:
+                record_id = existing["id"]
+                if float(existing["closing_stock"]) != closing:
+                    log_audit(
+                        conn,
+                        table_name="stock_items_daily",
+                        record_id=record_id,
+                        item_id=item_id,
+                        entry_date=entry_date,
+                        field_name="closing_stock",
+                        old_value=existing["closing_stock"],
+                        new_value=closing,
+                        changed_by=user_id,
+                    )
+                if float(existing["added_stock"]) != added:
+                    log_audit(
+                        conn,
+                        table_name="stock_items_daily",
+                        record_id=record_id,
+                        item_id=item_id,
+                        entry_date=entry_date,
+                        field_name="added_stock",
+                        old_value=existing["added_stock"],
+                        new_value=added,
+                        changed_by=user_id,
+                    )
+                conn.execute(
+                    """
+                    UPDATE stock_items_daily
+                    SET closing_stock = %s, added_stock = %s,
+                        submitted_by = %s, submitted_at = NOW()
+                    WHERE id = %s
+                    """,
+                    (closing, added, user_id, record_id),
+                )
+            else:
+                row = conn.execute(
+                    """
+                    INSERT INTO stock_items_daily
+                      (entry_date, item_id, closing_stock, added_stock, submitted_by)
+                    VALUES (%s, %s, %s, %s, %s)
+                    RETURNING id
+                    """,
+                    (entry_date, item_id, closing, added, user_id),
+                ).fetchone()
+                record_id = row["id"]
+                for field, val in [("closing_stock", closing), ("added_stock", added)]:
+                    log_audit(
+                        conn,
+                        table_name="stock_items_daily",
+                        record_id=record_id,
+                        item_id=item_id,
+                        entry_date=entry_date,
+                        field_name=field,
+                        old_value=None,
+                        new_value=val,
+                        changed_by=user_id,
+                    )
+            saved += 1
+        conn.commit()
+    return saved
+
+
+TABLE_BY_GROUP = {
+    "snacks_drinks": "snacks_drinks_daily",
+    "food_kuku": "food_kuku_daily",
+    "stock": "stock_items_daily",
+}
+
+
+def get_audit_timeline(
+    group: str,
+    date_from: Optional[date],
+    date_to: Optional[date],
+) -> list[dict[str, Any]]:
+    table_name = TABLE_BY_GROUP.get(group)
+    if not table_name:
+        return []
+    query = """
+        SELECT a.id, a.table_name, a.record_id, a.item_id, i.name AS item_name,
+               a.entry_date, a.field_name, a.old_value, a.new_value,
+               a.changed_by, a.changed_at,
+               TRIM(e.first_name || ' ' || e.last_name) AS changed_by_name
+        FROM inventory_audit_log a
+        LEFT JOIN items i ON i.id = a.item_id
+        LEFT JOIN employee e ON e.id = a.changed_by
+        WHERE a.table_name = %s
+    """
+    params: list[Any] = [table_name]
+    if date_from:
+        query += " AND a.entry_date >= %s"
+        params.append(date_from)
+    if date_to:
+        query += " AND a.entry_date <= %s"
+        params.append(date_to)
+    query += " ORDER BY a.changed_at DESC LIMIT 500"
+    with get_conn() as conn:
+        rows = conn.execute(query, params).fetchall()
+        return [dict(r) for r in rows]
+
+
+def get_inventory_audit(
+    group: str,
+    date_from: date,
+    date_to: date,
+) -> list[dict[str, Any]]:
+    """Per-item timeline with opening (prev closing), added, closing."""
+    if group == "snacks_drinks":
+        daily_table = "snacks_drinks_daily"
+        item_group = "snacks_drinks"
+    elif group == "food_kuku":
+        return _food_kuku_audit(date_from, date_to)
+    elif group == "stock":
+        daily_table = "stock_items_daily"
+        item_group = "stock"
+    else:
+        return []
+
+    with get_conn() as conn:
+        rows = conn.execute(
+            f"""
+            WITH dates AS (
+              SELECT generate_series(%s::date, %s::date, '1 day'::interval)::date AS entry_date
+            ),
+            items_list AS (
+              SELECT id, name FROM items
+              WHERE group_type = %s AND is_active = TRUE
+            )
+            SELECT il.id AS item_id, il.name AS item_name, d.entry_date,
+                   COALESCE(cur.closing_stock, 0) AS closing_stock,
+                   COALESCE(cur.added_stock, 0) AS added_stock,
+                   COALESCE(prev.closing_stock, 0) AS opening_stock,
+                   COALESCE(nxt.closing_stock, 0) AS next_closing_units,
+                   COALESCE(
+                     (SELECT ip.price_ksh FROM item_prices ip
+                      WHERE ip.item_id = il.id
+                      ORDER BY ip.effective_from DESC, ip.id DESC
+                      LIMIT 1),
+                     0
+                   ) AS price_ksh
+            FROM items_list il
+            CROSS JOIN dates d
+            LEFT JOIN {daily_table} cur
+              ON cur.item_id = il.id AND cur.entry_date = d.entry_date
+            LEFT JOIN {daily_table} prev
+              ON prev.item_id = il.id
+             AND prev.entry_date = (d.entry_date - INTERVAL '1 day')::date
+            LEFT JOIN {daily_table} nxt
+              ON nxt.item_id = il.id
+             AND nxt.entry_date = (d.entry_date + INTERVAL '1 day')::date
+            ORDER BY il.name, d.entry_date
+            """,
+            (date_from, date_to, item_group),
+        ).fetchall()
+        result = [dict(r) for r in rows]
+        if group == "snacks_drinks":
+            for row in result:
+                opening_units = float(row["closing_stock"]) + float(row["added_stock"])
+                sold_units = max(opening_units - float(row["next_closing_units"]), 0.0)
+                row["sold_units"] = sold_units
+                row["revenue"] = sold_units * float(row["price_ksh"])
+        return result
+
+
+def _food_kuku_audit(date_from: date, date_to: date) -> list[dict[str, Any]]:
+    with get_conn() as conn:
+        rows = conn.execute(
+            """
+            WITH dates AS (
+              SELECT generate_series(%s::date, %s::date, '1 day'::interval)::date AS entry_date
+            ),
+            items_list AS (
+              SELECT id, name FROM items
+              WHERE group_type = 'food_kuku' AND is_active = TRUE
+            )
+            SELECT il.id AS item_id, il.name AS item_name, d.entry_date,
+                   COALESCE(f.quantity, 0) AS quantity,
+                   COALESCE(
+                     (SELECT ip.price_ksh FROM item_prices ip
+                      WHERE ip.item_id = il.id
+                      ORDER BY ip.effective_from DESC, ip.id DESC
+                      LIMIT 1),
+                     0
+                   ) AS price_ksh,
+                   COALESCE(f.quantity, 0) * COALESCE(
+                     (SELECT ip.price_ksh FROM item_prices ip
+                      WHERE ip.item_id = il.id
+                      ORDER BY ip.effective_from DESC, ip.id DESC
+                      LIMIT 1),
+                     0
+                   ) AS revenue
+            FROM items_list il
+            CROSS JOIN dates d
+            LEFT JOIN food_kuku_daily f
+              ON f.item_id = il.id AND f.entry_date = d.entry_date
+            ORDER BY il.name, d.entry_date
+            """,
+            (date_from, date_to),
+        ).fetchall()
+        return [dict(r) for r in rows]

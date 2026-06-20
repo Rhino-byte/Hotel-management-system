@@ -1,4 +1,10 @@
-# Google API credentials
+# Environment
+.env
+.env.local
+backend/.env
+frontend/.env.local
+
+# Google API credentials (legacy)
 credentials.json
 token.pickle
 
@@ -14,7 +20,7 @@ dist/
 downloads/
 eggs/
 .eggs/
-lib/
+backend/lib/
 lib64/
 parts/
 sdist/
@@ -28,6 +34,7 @@ wheels/
 venv/
 env/
 ENV/
+hotel_env/
 
 # IDE
 .vscode/
@@ -39,5 +46,6 @@ ENV/
 .DS_Store
 Thumbs.db
 
-# Streamlit
-.streamlit/secrets.toml 
+# Next.js
+frontend/.next/
+frontend/node_modules/
