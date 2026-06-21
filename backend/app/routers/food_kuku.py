@@ -1,12 +1,14 @@
 from datetime import date
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 
 from app.deps import CurrentUser, require_module
+from app.schemas.admin import FoodDishPayload
 from app.schemas.daily import DailyQuantityPayload
 from core.roles import MODULE_FOOD_KUKU
 from db import daily as daily_db
+from db import items as items_db
 
 router = APIRouter(tags=["food-kuku"])
 
@@ -23,6 +25,18 @@ def get_food_kuku(
         "entries": rows,
         "total_revenue": total_revenue,
     }
+
+
+@router.post("/food-kuku/dishes")
+def add_food_dish(
+    payload: FoodDishPayload,
+    user: Annotated[CurrentUser, Depends(require_module(MODULE_FOOD_KUKU))],
+):
+    name = payload.name.strip()
+    if not name:
+        raise HTTPException(status_code=400, detail="Dish name is required")
+    item = items_db.create_food_item(name, payload.price_ksh, user.user_id)
+    return {"item": item}
 
 
 @router.post("/food-kuku")

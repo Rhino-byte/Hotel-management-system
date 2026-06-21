@@ -34,6 +34,51 @@ def get_item(item_id: int) -> Optional[dict[str, Any]]:
         return dict(row) if row else None
 
 
+def create_food_item(
+    name: str, price_ksh: float, user_id: Optional[int] = None
+) -> dict[str, Any]:
+    with get_conn() as conn:
+        row = conn.execute(
+            """
+            INSERT INTO items (name, group_type, is_active)
+            VALUES (%s, 'food_kuku', TRUE)
+            ON CONFLICT (group_type, name) DO UPDATE SET is_active = TRUE
+            RETURNING id, name, group_type, is_active
+            """,
+            (name,),
+        ).fetchone()
+        item = dict(row)
+        existing = conn.execute(
+            """
+            SELECT id FROM item_prices
+            WHERE item_id = %s
+            ORDER BY effective_from DESC, id DESC
+            LIMIT 1
+            """,
+            (item["id"],),
+        ).fetchone()
+        if existing:
+            conn.execute(
+                """
+                UPDATE item_prices
+                SET price_ksh = %s, updated_by = %s, updated_at = NOW()
+                WHERE id = %s
+                """,
+                (price_ksh, user_id, existing["id"]),
+            )
+        else:
+            conn.execute(
+                """
+                INSERT INTO item_prices (item_id, price_ksh, updated_by)
+                VALUES (%s, %s, %s)
+                """,
+                (item["id"], price_ksh, user_id),
+            )
+        conn.commit()
+        item["price_ksh"] = float(price_ksh)
+        return item
+
+
 def create_stock_item(name: str, user_id: Optional[int] = None) -> dict[str, Any]:
     with get_conn() as conn:
         row = conn.execute(

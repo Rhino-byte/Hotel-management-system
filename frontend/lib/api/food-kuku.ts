@@ -21,3 +21,13 @@ export async function saveFoodKuku(date: string, entries: QuantityEntry[]) {
     }),
   });
 }
+
+export async function addFoodDish(name: string, priceKsh: number) {
+  return apiFetch<{ item: { id: number; name: string; price_ksh: number } }>(
+    "/api/food-kuku/dishes",
+    {
+      method: "POST",
+      body: JSON.stringify({ name, price_ksh: priceKsh }),
+    }
+  );
+}
