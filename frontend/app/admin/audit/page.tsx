@@ -70,7 +70,7 @@ export default function AdminAuditPage() {
             <h1 className="page-title">Inventory Audit</h1>
             <p className="page-subtitle">
               {isSnacksGroup
-                ? "Snacks revenue = (closing + added) − next-day closing. Prev. day closing tracks stock continuity."
+                ? "Each day shows previous closing, added stock, and closing count. Sold units and revenue are computed from daily movement."
                 : "Review daily records. Opening equals previous day closing."}
             </p>
           </div>
@@ -117,9 +117,8 @@ export default function AdminAuditPage() {
                 {isSnacksGroup ? (
                   <>
                     <th>Prev. Day Closing</th>
-                    <th>Closing</th>
                     <th>Added</th>
-                    <th>Next-day Closing</th>
+                    <th>Closing</th>
                     <th>Price</th>
                     <th>Sold Units</th>
                     <th>Revenue</th>
@@ -147,9 +146,8 @@ export default function AdminAuditPage() {
                   {isSnacksGroup ? (
                     <>
                       <td>{r.opening_stock ?? 0}</td>
-                      <td>{r.closing_stock ?? 0}</td>
                       <td>{r.added_stock ?? 0}</td>
-                      <td>{r.next_closing_units ?? 0}</td>
+                      <td>{r.closing_stock ?? 0}</td>
                       <td>{Number(r.price_ksh ?? 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
                       <td>{r.sold_units ?? 0}</td>
                       <td>{(r.revenue ?? 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
