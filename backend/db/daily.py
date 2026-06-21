@@ -358,15 +358,21 @@ def save_stock_items_daily(
 
 
 def _compute_bar_metrics(record: dict[str, Any]) -> dict[str, Any]:
-    opening = float(record["opening_stock"])
-    added = float(record["added_stock"])
-    closing = float(record["closing_stock"])
+    opening = float(record.get("opening_stock") or 0)
+    added_raw = record.get("added_stock")
+    closing_raw = record.get("closing_stock")
+    added = float(added_raw) if added_raw is not None else 0.0
     total_units = opening + added
-    sold_units = max(total_units - closing, 0.0)
-    price_ksh = float(record["price_ksh"])
+    price_ksh = float(record.get("price_ksh") or 0)
     record["total_units"] = total_units
-    record["sold_units"] = sold_units
-    record["revenue"] = sold_units * price_ksh
+    if closing_raw is None:
+        record["sold_units"] = None
+        record["revenue"] = None
+    else:
+        closing = float(closing_raw)
+        sold_units = max(total_units - closing, 0.0)
+        record["sold_units"] = sold_units
+        record["revenue"] = sold_units * price_ksh
     if record.get("opening_from_date") is not None:
         record["opening_from_date"] = str(record["opening_from_date"])
     return record
@@ -379,8 +385,8 @@ def get_bar_daily(entry_date: date) -> list[dict[str, Any]]:
             SELECT i.id AS item_id, i.name, i.display_order,
                    COALESCE(prev.closing_stock, 0) AS opening_stock,
                    prev.opening_from_date,
-                   COALESCE(cur.added_stock, 0) AS added_stock,
-                   COALESCE(cur.closing_stock, 0) AS closing_stock,
+                   cur.added_stock,
+                   cur.closing_stock,
                    COALESCE(
                      (SELECT ip.price_ksh FROM item_prices ip
                       WHERE ip.item_id = i.id
@@ -397,7 +403,6 @@ def get_bar_daily(entry_date: date) -> list[dict[str, Any]]:
               FROM bar_daily p
               WHERE p.item_id = i.id
                 AND p.entry_date < %s
-                AND p.closing_stock > 0
               ORDER BY p.entry_date DESC
               LIMIT 1
             ) prev ON true
@@ -643,8 +648,8 @@ def _bar_audit(date_from: date, date_to: date) -> list[dict[str, Any]]:
             SELECT il.id AS item_id, il.name AS item_name, d.entry_date,
                    COALESCE(prev.closing_stock, 0) AS opening_stock,
                    prev.opening_from_date,
-                   COALESCE(cur.added_stock, 0) AS added_stock,
-                   COALESCE(cur.closing_stock, 0) AS closing_stock,
+                   cur.added_stock,
+                   cur.closing_stock,
                    COALESCE(
                      (SELECT ip.price_ksh FROM item_prices ip
                       WHERE ip.item_id = il.id
@@ -661,7 +666,6 @@ def _bar_audit(date_from: date, date_to: date) -> list[dict[str, Any]]:
               FROM bar_daily p
               WHERE p.item_id = il.id
                 AND p.entry_date < d.entry_date
-                AND p.closing_stock > 0
               ORDER BY p.entry_date DESC
               LIMIT 1
             ) prev ON true

@@ -15,11 +15,13 @@ export async function saveBar(date: string, entries: BarEntry[]) {
     method: "POST",
     body: JSON.stringify({
       date,
-      entries: entries.map((e) => ({
-        item_id: e.item_id,
-        added_stock: e.added_stock ?? 0,
-        closing_stock: e.closing_stock ?? 0,
-      })),
+      entries: entries
+        .filter((e) => e.closing_stock !== null && e.closing_stock !== undefined)
+        .map((e) => ({
+          item_id: e.item_id,
+          added_stock: e.added_stock ?? 0,
+          closing_stock: Number(e.closing_stock),
+        })),
     }),
   });
 }

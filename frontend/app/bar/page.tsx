@@ -1,70 +1,86 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
+import BarSavePreview from "../../components/BarSavePreview";
 import BarStockGrid from "../../components/BarStockGrid";
 import LoadingScreen from "../../components/LoadingScreen";
 import SaveButton from "../../components/SaveButton";
 import SavingOverlay from "../../components/SavingOverlay";
 import { fetchBar, saveBar, todayIso } from "../../lib/api";
+import { barTotals, recomputeBarEntry } from "../../lib/bar-utils";
 import { useRequireAuth } from "../../lib/auth";
 import type { BarEntry } from "../../lib/types";
-
-function recomputeEntry(entry: BarEntry): BarEntry {
-  const opening = Number(entry.opening_stock ?? 0);
-  const added = Number(entry.added_stock ?? 0);
-  const closing = Number(entry.closing_stock ?? 0);
-  const total = opening + added;
-  const sold = Math.max(total - closing, 0);
-  const price = Number(entry.price_ksh ?? 0);
-  return {
-    ...entry,
-    total_units: total,
-    sold_units: sold,
-    revenue: sold * price,
-  };
-}
 
 export default function BarPage() {
   const { user, loading } = useRequireAuth(["bar"]);
   const [date, setDate] = useState(todayIso());
   const [query, setQuery] = useState("");
   const [entries, setEntries] = useState<BarEntry[]>([]);
+  const [dirtyIds, setDirtyIds] = useState<Set<number>>(new Set());
   const [totalSoldUnits, setTotalSoldUnits] = useState(0);
   const [totalRevenue, setTotalRevenue] = useState(0);
   const [saving, setSaving] = useState(false);
+  const [previewOpen, setPreviewOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
+
+  const applyTotals = useCallback((list: BarEntry[]) => {
+    const t = barTotals(list);
+    setTotalSoldUnits(t.totalSoldUnits);
+    setTotalRevenue(t.totalRevenue);
+  }, []);
 
   useEffect(() => {
     if (loading || !user) return;
     setError(null);
+    setDirtyIds(new Set());
     fetchBar(date)
       .then((d) => {
-        setEntries(d.entries);
-        setTotalSoldUnits(d.total_sold_units ?? 0);
-        setTotalRevenue(d.total_revenue ?? 0);
+        const normalized = d.entries.map((e) => recomputeBarEntry(e));
+        setEntries(normalized);
+        applyTotals(normalized);
       })
       .catch((e) => setError(e.message));
-  }, [date, loading, user]);
+  }, [date, loading, user, applyTotals]);
 
-  const onChange = (itemId: number, field: "added_stock" | "closing_stock", value: number) => {
+  const onChange = (
+    itemId: number,
+    field: "added_stock" | "closing_stock",
+    value: number | null
+  ) => {
     setEntries((prev) => {
       const next = prev.map((e) =>
-        e.item_id === itemId ? recomputeEntry({ ...e, [field]: value }) : e
+        e.item_id === itemId ? recomputeBarEntry({ ...e, [field]: value }) : e
       );
-      setTotalSoldUnits(next.reduce((sum, e) => sum + Number(e.sold_units ?? 0), 0));
-      setTotalRevenue(next.reduce((sum, e) => sum + Number(e.revenue ?? 0), 0));
+      applyTotals(next);
       return next;
     });
+    setDirtyIds((prev) => new Set(prev).add(itemId));
   };
 
-  const onSave = async () => {
+  const onReviewSave = () => {
+    if (dirtyIds.size === 0) {
+      setError("No changes to save. Edit Add or B.B.F on items first.");
+      return;
+    }
+    setError(null);
+    setPreviewOpen(true);
+  };
+
+  const onConfirmSave = async () => {
+    const dirtyEntries = entries.filter((e) => dirtyIds.has(e.item_id));
     setSaving(true);
     setError(null);
     setMessage(null);
     try {
-      const res = await saveBar(date, entries);
+      const res = await saveBar(date, dirtyEntries);
       setMessage(`Saved ${res.saved} entries for ${date}.`);
+      setPreviewOpen(false);
+      setDirtyIds(new Set());
+      const refreshed = await fetchBar(date);
+      const normalized = refreshed.entries.map((e) => recomputeBarEntry(e));
+      setEntries(normalized);
+      applyTotals(normalized);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Save failed");
     } finally {
@@ -81,7 +97,7 @@ export default function BarPage() {
   const carryDates = Array.from(
     new Set(
       entries
-        .filter((e) => e.opening_from_date && Number(e.opening_stock) > 0)
+        .filter((e) => e.opening_from_date != null)
         .map((e) => e.opening_from_date as string)
     )
   ).sort();
@@ -94,8 +110,8 @@ export default function BarPage() {
           <div>
             <h1 className="page-title">Bar Stock</h1>
             <p className="page-subtitle">
-              Opening stock carries from the most recent saved B.B.F (where B.B.F &gt; 0),
-              not necessarily yesterday. Sales = (Opening + Add) − B.B.F closing count.
+              Opening carries from the most recent saved B.B.F before this date (zero counts).
+              Preview before save — only edited rows are written. Sales = (Opening + Add) − B.B.F.
             </p>
           </div>
         </div>
@@ -141,11 +157,21 @@ export default function BarPage() {
         <BarStockGrid entries={filteredEntries} onChange={onChange} />
         <SaveButton
           saving={saving}
-          onClick={onSave}
-          label="Save All"
+          onClick={onReviewSave}
+          label={dirtyIds.size > 0 ? `Review & save (${dirtyIds.size})` : "Review & save"}
           className="btn btn-primary"
         />
       </div>
+      {previewOpen && (
+        <BarSavePreview
+          date={date}
+          entries={entries}
+          dirtyIds={dirtyIds}
+          saving={saving}
+          onCancel={() => setPreviewOpen(false)}
+          onConfirm={onConfirmSave}
+        />
+      )}
     </main>
   );
 }

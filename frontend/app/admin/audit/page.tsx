@@ -80,7 +80,7 @@ export default function AdminAuditPage() {
               {isSnacksGroup
                 ? "Each day shows previous closing, added stock, total (prev. closing + added), and closing count. Sold units and revenue are computed from daily movement."
                 : isBarGroup
-                  ? "Bar stock: opening uses the most recent saved B.B.F before each date (B.B.F > 0). Sales = (Opening + Add) − B.B.F."
+                  ? "Bar stock: opening uses the most recent saved B.B.F before each date (zero counts). Sales = (Opening + Add) − B.B.F."
                   : "Review daily records. Opening equals previous day closing."}
             </p>
           </div>

@@ -53,12 +53,12 @@ export type BarEntry = {
   name: string;
   display_order?: number;
   opening_stock: number;
-  added_stock: number;
-  closing_stock: number;
-  total_units?: number;
-  sold_units?: number;
+  added_stock: number | null;
+  closing_stock: number | null;
+  total_units?: number | null;
+  sold_units?: number | null;
   price_ksh?: number;
-  revenue?: number;
+  revenue?: number | null;
   record_id?: number | null;
   opening_from_date?: string | null;
 };

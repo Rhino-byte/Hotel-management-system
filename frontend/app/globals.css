@@ -554,6 +554,111 @@ h2 {
   font-size: 0.9rem;
 }
 
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: grid;
+  place-items: center;
+  padding: 1rem;
+  background: rgba(2, 6, 23, 0.75);
+  backdrop-filter: blur(3px);
+}
+
+.modal-panel {
+  width: min(960px, 100%);
+  max-height: min(90vh, 900px);
+  overflow: auto;
+  background: var(--surface);
+  border: 1px solid rgba(148, 163, 184, 0.25);
+  border-radius: var(--radius-lg);
+  padding: 1.25rem;
+  box-shadow: 0 24px 48px rgba(2, 6, 23, 0.6);
+}
+
+.modal-panel-wide {
+  width: min(1100px, 100%);
+}
+
+.modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.modal-title {
+  margin: 0;
+  font-size: 1.25rem;
+}
+
+.modal-subtitle {
+  margin: 0.35rem 0 0;
+  color: var(--text-soft);
+  font-size: 0.88rem;
+}
+
+.modal-actions {
+  display: flex;
+  gap: 0.75rem;
+  justify-content: flex-end;
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--border);
+}
+
+.btn-sm {
+  padding: 0.4rem 0.75rem;
+  font-size: 0.85rem;
+}
+
+.bar-preview-tabs {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+}
+
+.bar-preview-tab {
+  flex: 1;
+  padding: 0.55rem 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface-muted);
+  color: var(--text-soft);
+  cursor: pointer;
+  font-weight: 600;
+  font-size: 0.85rem;
+}
+
+.bar-preview-tab.active {
+  color: var(--text);
+  border-color: rgba(59, 130, 246, 0.5);
+  background: rgba(59, 130, 246, 0.12);
+}
+
+.bar-preview-table {
+  max-height: 360px;
+  overflow: auto;
+}
+
+.bar-preview-row-dirty {
+  background: rgba(59, 130, 246, 0.08);
+}
+
+.bar-preview-row-warn {
+  background: rgba(185, 28, 28, 0.12);
+}
+
+.bar-preview-ack {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 0.75rem;
+  font-size: 0.9rem;
+  color: var(--text-soft);
+}
+
 @media (max-width: 900px) {
   .nav-inner,
   .page {
