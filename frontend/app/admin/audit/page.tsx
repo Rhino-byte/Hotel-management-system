@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { fetchInventoryAudit, todayIso } from "../../../lib/api";
-import { useRequireAuth } from "../../../lib/auth";
+import { useRequireAuditAccess } from "../../../lib/auth";
 import type { AuditRow } from "../../../lib/types";
 import LoadingScreen from "../../../components/LoadingScreen";
 import SearchableSelect from "../../../components/SearchableSelect";
@@ -11,12 +11,14 @@ const GROUPS = [
   { value: "snacks_drinks", label: "Snacks & Drinks" },
   { value: "food_kuku", label: "Food & Kuku" },
   { value: "stock", label: "Stock Items" },
+  { value: "bar", label: "Bar Stock" },
 ];
 
 function defaultAuditGroup(modules: string[]): string {
   if (modules.includes("snacks_drinks")) return "snacks_drinks";
   if (modules.includes("food_kuku")) return "food_kuku";
   if (modules.includes("stock_items")) return "stock";
+  if (modules.includes("bar")) return "bar";
   return "snacks_drinks";
 }
 
@@ -25,7 +27,7 @@ function stockTotal(row: AuditRow): number {
 }
 
 export default function AdminAuditPage() {
-  const { user, loading } = useRequireAuth();
+  const { user, loading } = useRequireAuditAccess();
   const [group, setGroup] = useState("snacks_drinks");
   const [groupInitialized, setGroupInitialized] = useState(false);
   const [dateFrom, setDateFrom] = useState(todayIso());
@@ -55,12 +57,14 @@ export default function AdminAuditPage() {
 
   const isSnacksGroup = group === "snacks_drinks";
   const isStockGroup = group === "stock";
+  const isBarGroup = group === "bar";
   const groupOptions = GROUPS.filter((g) =>
     user.role === "admin"
       ? true
       : (g.value === "snacks_drinks" && user.modules.includes("snacks_drinks")) ||
         (g.value === "food_kuku" && user.modules.includes("food_kuku")) ||
-        (g.value === "stock" && user.modules.includes("stock_items"))
+        (g.value === "stock" && user.modules.includes("stock_items")) ||
+        (g.value === "bar" && user.modules.includes("bar"))
   );
   const filteredRows = rows.filter((r) =>
     r.item_name.toLowerCase().includes(query.trim().toLowerCase())
@@ -75,7 +79,9 @@ export default function AdminAuditPage() {
             <p className="page-subtitle">
               {isSnacksGroup
                 ? "Each day shows previous closing, added stock, total (prev. closing + added), and closing count. Sold units and revenue are computed from daily movement."
-                : "Review daily records. Opening equals previous day closing."}
+                : isBarGroup
+                  ? "Bar stock: opening uses the most recent saved B.B.F before each date (B.B.F > 0). Sales = (Opening + Add) − B.B.F."
+                  : "Review daily records. Opening equals previous day closing."}
             </p>
           </div>
         </div>
@@ -128,6 +134,16 @@ export default function AdminAuditPage() {
                     <th>Sold Units</th>
                     <th>Revenue</th>
                   </>
+                ) : isBarGroup ? (
+                  <>
+                    <th>Open</th>
+                    <th>Add</th>
+                    <th>Total</th>
+                    <th>B.B.F</th>
+                    <th>Sales</th>
+                    <th>Price</th>
+                    <th>Amount</th>
+                  </>
                 ) : isStockGroup ? (
                   <>
                     <th>Prev. Day Closing</th>
@@ -157,6 +173,16 @@ export default function AdminAuditPage() {
                       <td>{r.closing_stock ?? 0}</td>
                       <td>{Number(r.price_ksh ?? 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
                       <td>{r.sold_units ?? 0}</td>
+                      <td>{(r.revenue ?? 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
+                    </>
+                  ) : isBarGroup ? (
+                    <>
+                      <td>{r.opening_stock ?? 0}</td>
+                      <td>{r.added_stock ?? 0}</td>
+                      <td>{Number(r.total_units ?? stockTotal(r))}</td>
+                      <td>{r.closing_stock ?? 0}</td>
+                      <td>{r.sold_units ?? 0}</td>
+                      <td>{Number(r.price_ksh ?? 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
                       <td>{(r.revenue ?? 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
                     </>
                   ) : isStockGroup ? (

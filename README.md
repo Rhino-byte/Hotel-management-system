@@ -21,6 +21,7 @@ Hotel-management-system/
 | Snacks & Drinks | `snacks_clerk`, `admin` | Closing stock + added stock per item/day |
 | Food & Kuku | `food_clerk`, `admin` | Quantity sold per dish/day |
 | Stock Items | `stock_clerk`, `admin` | Raw material closing + added stock |
+| Bar Stock | `bar_clerk`, `admin` | Opening (carried), add, B.B.F closing; same-day sales |
 | Admin | `admin` | Prices, stock catalog, audit views |
 
 ## Quick start (local)
@@ -112,4 +113,5 @@ Alternatively, bulk-assign via `backend/scripts/seed_hotel_roles.py` (edit the m
 | `snacks_clerk` | `/snacks-drinks` | Snacks & Drinks module only |
 | `food_clerk` | `/food-kuku` | Food & Kuku module only |
 | `stock_clerk` | `/stock-items` | Stock Items module only |
+| `bar_clerk` | `/bar` | Bar Stock module only |
 | `admin` | All modules + admin tabs | All modules |

@@ -23,3 +23,14 @@ class DailyStockPayload(BaseModel):
 class DailyQuantityPayload(BaseModel):
     date: date
     entries: List[QuantityEntry]
+
+
+class BarStockEntry(BaseModel):
+    item_id: int
+    added_stock: float = 0
+    closing_stock: float = 0
+
+
+class DailyBarPayload(BaseModel):
+    date: date
+    entries: List[BarStockEntry]

@@ -5,6 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 
 from app.deps import CurrentUser, get_current_user
 from core.roles import (
+    MODULE_BAR,
     MODULE_FOOD_KUKU,
     MODULE_SNACKS_DRINKS,
     MODULE_STOCK_ITEMS,
@@ -18,6 +19,7 @@ GROUP_MODULE_MAP = {
     "snacks_drinks": MODULE_SNACKS_DRINKS,
     "food_kuku": MODULE_FOOD_KUKU,
     "stock": MODULE_STOCK_ITEMS,
+    "bar": MODULE_BAR,
 }
 
 

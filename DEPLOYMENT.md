@@ -7,9 +7,12 @@
 3. **Build command:** `pip install -r requirements.txt`
 4. **Start command:** `uvicorn app.main:app --host 0.0.0.0 --port $PORT`
 5. Set environment variables:
-   - `DATABASE_URL` — Neon PostgreSQL connection string
-   - `JWT_SECRET` — long random secret
-   - `CORS_ORIGINS` — your Vercel frontend URL(s), comma-separated
+   - `DATABASE_URL` — Neon PostgreSQL connection string (`?sslmode=require`)
+   - `JWT_SECRET` — long random secret (at least 32 characters; app refuses to start in production without it)
+   - `APP_ENV` — set to `production` on Render
+   - `CORS_ORIGINS` — your Vercel frontend URL(s) only, comma-separated (https)
+   - `LOGIN_RATE_LIMIT_MAX` — optional, default `5` failed attempts
+   - `LOGIN_RATE_LIMIT_WINDOW_SEC` — optional, default `900` (15 minutes)
 
 ### First-time DB setup
 
@@ -21,6 +24,15 @@ python scripts/run_migrations.py
 python scripts/seed_items_and_prices.py
 python scripts/introspect_neon.py
 ```
+
+Migration `003_admin_action_log.sql` creates the admin action audit table (price changes, role assignments, catalog updates).
+
+### Production security checklist
+
+- `APP_ENV=production` disables FastAPI `/docs` and validates secrets on startup
+- Login is rate-limited per IP + first name
+- Only payroll `ADMIN` can assign `hotel_role = admin`
+- Admin mutations are logged to `admin_action_log` (`GET /api/admin/actions` for review)
 
 ## Frontend (Vercel)
 
@@ -48,7 +60,7 @@ Ensure `frontend/.env` has `NEXT_PUBLIC_API_BASE=http://localhost:8000` and the 
 ## User roles
 
 Users must exist in Neon with bcrypt `password_hash` and one of:
-`admin`, `snacks_clerk`, `food_clerk`, `stock_clerk`
+`admin`, `snacks_clerk`, `food_clerk`, `stock_clerk`, `bar_clerk`
 
 Hash a password for seeding:
 ```bash

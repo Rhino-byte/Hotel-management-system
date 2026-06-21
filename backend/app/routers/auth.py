@@ -1,14 +1,20 @@
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 
 from app.deps import CurrentUser, get_current_user
+from app.rate_limit import login_rate_limiter
 from app.schemas.auth import LoginPayload
 from app.security import create_access_token
 from core.roles import allowed_modules, default_route_for_role
 from db.employees import authenticate_employee, get_employee_by_id
 
 router = APIRouter(tags=["auth"])
+
+
+def _login_rate_key(request: Request, first_name: str) -> str:
+    client_ip = request.client.host if request.client else "unknown"
+    return f"{client_ip}:{first_name.strip().lower()}"
 
 
 def _user_response(employee: dict) -> dict:
@@ -26,13 +32,25 @@ def _user_response(employee: dict) -> dict:
 
 
 @router.post("/auth/login")
-def login(payload: LoginPayload):
+def login(payload: LoginPayload, request: Request):
+    rate_key = _login_rate_key(request, payload.first_name)
+    if login_rate_limiter.is_blocked(rate_key):
+        raise HTTPException(
+            status_code=429,
+            detail="Too many login attempts. Try again later.",
+        )
+
     employee = authenticate_employee(payload.first_name, payload.pin)
     if not employee:
+        login_rate_limiter.record_failure(rate_key)
         raise HTTPException(status_code=401, detail="Invalid first name or PIN")
+
     effective = employee.get("effective_hotel_role")
     if not effective:
+        login_rate_limiter.record_failure(rate_key)
         raise HTTPException(status_code=403, detail="No hotel access assigned")
+
+    login_rate_limiter.reset(rate_key)
     token = create_access_token(
         employee_id=employee["id"],
         hotel_role=effective,

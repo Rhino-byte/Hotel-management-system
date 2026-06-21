@@ -139,8 +139,8 @@ def list_all_items_with_prices() -> list[dict[str, Any]]:
                     LIMIT 1) AS price_id
             FROM items i
             WHERE i.is_active = TRUE
-              AND i.group_type IN ('snacks_drinks', 'food_kuku')
-            ORDER BY i.group_type, i.name
+              AND i.group_type IN ('snacks_drinks', 'food_kuku', 'bar')
+            ORDER BY i.group_type, i.display_order, i.name
             """
         ).fetchall()
         return [dict(r) for r in rows]
@@ -160,16 +160,19 @@ def update_item_price(item_id: int, price_ksh: float, user_id: int) -> dict[str,
         return dict(row)
 
 
-def upsert_catalog_item(group_type: str, name: str, price_ksh: float) -> int:
+def upsert_catalog_item(
+    group_type: str, name: str, price_ksh: float, display_order: int = 0
+) -> int:
     with get_conn() as conn:
         row = conn.execute(
             """
-            INSERT INTO items (name, group_type, is_active)
-            VALUES (%s, %s, TRUE)
-            ON CONFLICT (group_type, name) DO UPDATE SET is_active = TRUE
+            INSERT INTO items (name, group_type, is_active, display_order)
+            VALUES (%s, %s, TRUE, %s)
+            ON CONFLICT (group_type, name) DO UPDATE
+              SET is_active = TRUE, display_order = EXCLUDED.display_order
             RETURNING id
             """,
-            (name, group_type),
+            (name, group_type, display_order),
         ).fetchone()
         item_id = row["id"]
         existing = conn.execute(

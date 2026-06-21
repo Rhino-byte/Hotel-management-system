@@ -8,6 +8,7 @@ const MODULE_LINKS = [
   { href: "/snacks-drinks", label: "Snacks & Drinks", module: "snacks_drinks" },
   { href: "/food-kuku", label: "Food & Kuku", module: "food_kuku" },
   { href: "/stock-items", label: "Stock Items", module: "stock_items" },
+  { href: "/bar", label: "Bar Stock", module: "bar" },
 ];
 
 const ADMIN_LINKS = [

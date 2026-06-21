@@ -18,6 +18,7 @@ if env_path.exists():
         os.environ.setdefault(key.strip(), value.strip().strip('"').strip("'"))
 
 from core.catalog import (  # noqa: E402
+    BAR_ITEMS,
     FOOD_KUKU_CATEGORIES,
     ITEM_PRICES,
     SNACKS_DRINKS_CATEGORIES,
@@ -45,6 +46,11 @@ def main() -> None:
         upsert_catalog_item("stock", name, 0.0)
         count += 1
         print(f"  stock: {name}")
+
+    for order, (name, price) in enumerate(BAR_ITEMS, start=1):
+        upsert_catalog_item("bar", name, float(price), display_order=order)
+        count += 1
+        print(f"  bar [{order}]: {name} @ {price}")
 
     with get_conn() as conn:
         totals = conn.execute(

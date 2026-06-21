@@ -6,7 +6,8 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from app.deps import CurrentUser, require_module
 from app.schemas.admin import FoodDishPayload
 from app.schemas.daily import DailyQuantityPayload
-from core.roles import MODULE_FOOD_KUKU
+from core.roles import MODULE_FOOD_KUKU, ROLE_ADMIN
+from db import admin_audit as admin_audit_db
 from db import daily as daily_db
 from db import items as items_db
 
@@ -36,6 +37,13 @@ def add_food_dish(
     if not name:
         raise HTTPException(status_code=400, detail="Dish name is required")
     item = items_db.create_food_item(name, payload.price_ksh, user.user_id)
+    admin_audit_db.log_admin_action(
+        action_type="food_dish.create",
+        performed_by=user.user_id,
+        target_type="item",
+        target_id=item["id"],
+        details={"name": name, "price_ksh": payload.price_ksh},
+    )
     return {"item": item}
 
 

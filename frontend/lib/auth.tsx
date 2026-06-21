@@ -99,3 +99,10 @@ export function useRequireAuth(allowedModules?: string[], requireAdmin = false) 
 
   return { user, loading };
 }
+
+/** Inventory audit: admin or any clerk with a stock/food module. */
+export const AUDIT_MODULES = ["snacks_drinks", "food_kuku", "stock_items", "bar"] as const;
+
+export function useRequireAuditAccess() {
+  return useRequireAuth([...AUDIT_MODULES]);
+}

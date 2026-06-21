@@ -48,6 +48,21 @@ export type PriceItem = {
   price_id?: number | null;
 };
 
+export type BarEntry = {
+  item_id: number;
+  name: string;
+  display_order?: number;
+  opening_stock: number;
+  added_stock: number;
+  closing_stock: number;
+  total_units?: number;
+  sold_units?: number;
+  price_ksh?: number;
+  revenue?: number;
+  record_id?: number | null;
+  opening_from_date?: string | null;
+};
+
 export type AuditRow = {
   item_id: number;
   item_name: string;
@@ -57,6 +72,7 @@ export type AuditRow = {
   added_stock?: number;
   next_closing_units?: number;
   sold_units?: number;
+  total_units?: number;
   quantity?: number;
   price_ksh?: number;
   revenue?: number;
@@ -67,5 +83,6 @@ export const HOTEL_ROLE_OPTIONS = [
   { value: "snacks_clerk", label: "Snacks Clerk" },
   { value: "food_clerk", label: "Food Clerk" },
   { value: "stock_clerk", label: "Stock Clerk" },
+  { value: "bar_clerk", label: "Bar Clerk" },
   { value: "admin", label: "Hotel Admin" },
 ];

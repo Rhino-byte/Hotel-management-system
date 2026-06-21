@@ -20,7 +20,7 @@ Hotel login: **first_name + pin** (PIN alone is not unique).
 | `id` | integer (PK) | Same id as `user_auth` |
 | `first_name`, `last_name` | varchar | |
 | `role` | enum | Payroll: `STAFF`, `MANAGER`, `ADMIN` — **never modified by hotel app** |
-| `hotel_role` | enum (nullable) | Hotel: `snacks_clerk`, `food_clerk`, `stock_clerk`, `admin` |
+| `hotel_role` | enum (nullable) | Hotel: `snacks_clerk`, `food_clerk`, `stock_clerk`, `bar_clerk`, `admin` |
 
 Added by migration `002_employee_hotel_role.sql`.
 
@@ -32,6 +32,7 @@ Added by migration `002_employee_hotel_role.sql`.
 | `employee.hotel_role = snacks_clerk` | Snacks & Drinks |
 | `employee.hotel_role = food_clerk` | Food & Kuku |
 | `employee.hotel_role = stock_clerk` | Stock Items |
+| `employee.hotel_role = bar_clerk` | Bar Stock |
 | `employee.hotel_role = admin` | Full hotel admin |
 | No `hotel_role` and not payroll ADMIN | No hotel access — login blocked |
 
@@ -49,7 +50,7 @@ Clerks see only their module tab plus **Audit** (scoped to their module). Payrol
 FKs reference `employee(id)` for `updated_by`, `submitted_by`, `changed_by`:
 
 - `items`, `item_prices`
-- `snacks_drinks_daily`, `food_kuku_daily`, `stock_items_daily`
+- `snacks_drinks_daily`, `food_kuku_daily`, `stock_items_daily`, `bar_daily`
 - `inventory_audit_log`
 
 ## Setup commands
