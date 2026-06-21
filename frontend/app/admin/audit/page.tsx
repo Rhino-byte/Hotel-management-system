@@ -20,6 +20,10 @@ function defaultAuditGroup(modules: string[]): string {
   return "snacks_drinks";
 }
 
+function stockTotal(row: AuditRow): number {
+  return Number(row.opening_stock ?? 0) + Number(row.added_stock ?? 0);
+}
+
 export default function AdminAuditPage() {
   const { user, loading } = useRequireAuth();
   const [group, setGroup] = useState("snacks_drinks");
@@ -70,7 +74,7 @@ export default function AdminAuditPage() {
             <h1 className="page-title">Inventory Audit</h1>
             <p className="page-subtitle">
               {isSnacksGroup
-                ? "Each day shows previous closing, added stock, and closing count. Sold units and revenue are computed from daily movement."
+                ? "Each day shows previous closing, added stock, total (prev. closing + added), and closing count. Sold units and revenue are computed from daily movement."
                 : "Review daily records. Opening equals previous day closing."}
             </p>
           </div>
@@ -118,6 +122,7 @@ export default function AdminAuditPage() {
                   <>
                     <th>Prev. Day Closing</th>
                     <th>Added</th>
+                    <th>Total</th>
                     <th>Closing</th>
                     <th>Price</th>
                     <th>Sold Units</th>
@@ -127,6 +132,7 @@ export default function AdminAuditPage() {
                   <>
                     <th>Prev. Day Closing</th>
                     <th>Added</th>
+                    <th>Total</th>
                     <th>Closing</th>
                   </>
                 ) : (
@@ -147,6 +153,7 @@ export default function AdminAuditPage() {
                     <>
                       <td>{r.opening_stock ?? 0}</td>
                       <td>{r.added_stock ?? 0}</td>
+                      <td>{stockTotal(r)}</td>
                       <td>{r.closing_stock ?? 0}</td>
                       <td>{Number(r.price_ksh ?? 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
                       <td>{r.sold_units ?? 0}</td>
@@ -156,6 +163,7 @@ export default function AdminAuditPage() {
                     <>
                       <td>{r.opening_stock ?? 0}</td>
                       <td>{r.added_stock ?? 0}</td>
+                      <td>{stockTotal(r)}</td>
                       <td>{r.closing_stock ?? 0}</td>
                     </>
                   ) : (
