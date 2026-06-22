@@ -26,12 +26,20 @@ export async function apiFetch<T>(path: string, options: RequestInit = {}): Prom
 
   const res = await fetch(`${API_BASE}${path}`, { ...options, headers });
   if (res.status === 401 && typeof window !== "undefined") {
+    const body = await res.json().catch(() => ({}));
+    const detail =
+      typeof body.detail === "string"
+        ? body.detail
+        : Array.isArray(body.detail)
+          ? body.detail.map((e: { msg?: string }) => e.msg).filter(Boolean).join(", ")
+          : undefined;
     const hadToken = Boolean(token);
-    setToken(null);
-    if (hadToken && window.location.pathname !== "/login") {
+    const isLoginRequest = path === "/api/auth/login" || path.endsWith("/auth/login");
+    if (hadToken && !isLoginRequest && window.location.pathname !== "/login") {
+      setToken(null);
       window.location.href = "/login";
     }
-    throw new Error("Unauthorized");
+    throw new Error(detail || "Unauthorized");
   }
   if (!res.ok) {
     const body = await res.json().catch(() => ({}));

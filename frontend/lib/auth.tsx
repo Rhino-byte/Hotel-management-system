@@ -6,6 +6,7 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type ReactNode,
 } from "react";
@@ -27,20 +28,30 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const router = useRouter();
+  const authGenRef = useRef(0);
 
   const refresh = useCallback(async () => {
+    const gen = authGenRef.current;
     try {
       if (!getToken()) {
-        setUser(null);
+        if (gen === authGenRef.current) {
+          setUser(null);
+        }
         return;
       }
       const me = await fetchMe();
-      setUser(me);
+      if (gen === authGenRef.current) {
+        setUser(me);
+      }
     } catch {
-      setUser(null);
-      setToken(null);
+      if (gen === authGenRef.current) {
+        setUser(null);
+        setToken(null);
+      }
     } finally {
-      setLoading(false);
+      if (gen === authGenRef.current) {
+        setLoading(false);
+      }
     }
   }, []);
 
@@ -50,6 +61,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const login = useCallback(
     async (firstName: string, pin: number) => {
+      authGenRef.current += 1;
+      setToken(null);
       const res = await apiLogin(firstName, pin);
       setToken(res.access_token);
       setUser(res.user);
@@ -59,6 +72,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   );
 
   const logout = useCallback(() => {
+    authGenRef.current += 1;
     setToken(null);
     setUser(null);
     router.push("/login");
