@@ -1,18 +1,16 @@
-import type { StockEntry } from "../types";
+import type { SnacksEntry } from "../types";
 import { apiFetch } from "./client";
 
 export async function fetchSnacksDrinks(date: string) {
   return apiFetch<{
     date: string;
-    entries: StockEntry[];
+    entries: SnacksEntry[];
     total_sold_units: number;
     total_revenue: number;
-  }>(
-    `/api/snacks-drinks?date=${encodeURIComponent(date)}`
-  );
+  }>(`/api/snacks-drinks?date=${encodeURIComponent(date)}`);
 }
 
-export async function saveSnacksDrinks(date: string, entries: StockEntry[]) {
+export async function saveSnacksDrinks(date: string, entries: SnacksEntry[]) {
   return apiFetch<{ saved: number }>("/api/snacks-drinks", {
     method: "POST",
     body: JSON.stringify({

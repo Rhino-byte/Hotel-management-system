@@ -491,6 +491,77 @@ h2 {
   border-radius: var(--radius-sm);
 }
 
+.input-cell-touch {
+  min-height: 44px;
+  font-size: 16px;
+}
+
+.stock-entry-layout {
+  margin-top: 1rem;
+}
+
+.stock-entry-cards {
+  display: none;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.stock-entry-card {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  padding: 0.85rem 1rem;
+}
+
+.stock-entry-card-title {
+  margin: 0 0 0.65rem;
+  font-size: 1rem;
+  font-weight: 600;
+  line-height: 1.3;
+  word-break: break-word;
+}
+
+.stock-entry-card-stats {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.5rem 0.75rem;
+  margin: 0 0 0.85rem;
+  font-size: 0.84rem;
+}
+
+.stock-entry-card-stats div {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.stock-entry-card-stats dt {
+  color: #94a3b8;
+  font-size: 0.75rem;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.stock-entry-card-stats dd {
+  margin: 0;
+  font-weight: 600;
+}
+
+.stock-entry-card-fields {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.65rem;
+}
+
+.stock-entry-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  font-size: 0.84rem;
+  font-weight: 500;
+}
+
 .revenue-banner {
   display: flex;
   justify-content: space-between;
@@ -696,5 +767,25 @@ h2 {
 
   .card {
     padding: 1rem;
+  }
+
+  .revenue-banner {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.35rem;
+  }
+}
+
+@media (max-width: 640px) {
+  .stock-entry-table {
+    display: none;
+  }
+
+  .stock-entry-cards {
+    display: flex;
+  }
+
+  .stock-entry-layout .table-wrap {
+    margin-top: 0;
   }
 }

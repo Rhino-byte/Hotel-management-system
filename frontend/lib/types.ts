@@ -19,6 +19,20 @@ export type EmployeeRow = {
   effective_hotel_role: string | null;
 };
 
+export type SnacksEntry = {
+  item_id: number;
+  name: string;
+  previous_closing: number;
+  previous_from_date?: string | null;
+  added_stock: number | null;
+  closing_stock: number | null;
+  total_units?: number | null;
+  sold_units?: number | null;
+  price_ksh?: number;
+  revenue?: number | null;
+  record_id?: number | null;
+};
+
 export type StockEntry = {
   item_id: number;
   name: string;

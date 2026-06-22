@@ -1,11 +1,11 @@
 "use client";
 
-import { formatBarCell } from "../lib/bar-utils";
-import type { BarEntry } from "../lib/types";
+import { formatSnacksCell } from "../lib/snacks-utils";
+import type { SnacksEntry } from "../lib/types";
 import StockEntryCards from "./StockEntryCards";
 
 type Props = {
-  entries: BarEntry[];
+  entries: SnacksEntry[];
   onChange: (
     itemId: number,
     field: "added_stock" | "closing_stock",
@@ -19,13 +19,13 @@ function parseInput(value: string): number | null {
   return Number.isNaN(n) ? null : n;
 }
 
-export default function BarStockGrid({ entries, onChange }: Props) {
+export default function SnacksStockGrid({ entries, onChange }: Props) {
   const cardRows = entries.map((row) => ({
     item_id: row.item_id,
     name: row.name,
-    startLabel: "Open",
-    startValue: row.opening_stock,
-    endFieldLabel: "B.B.F",
+    startLabel: "Prev closing",
+    startValue: row.previous_closing,
+    endFieldLabel: "Closing",
     added_stock: row.added_stock,
     closing_stock: row.closing_stock,
     total_units: row.total_units,
@@ -41,10 +41,10 @@ export default function BarStockGrid({ entries, onChange }: Props) {
           <thead>
             <tr>
               <th>Item</th>
-              <th>Open</th>
+              <th>Prev closing</th>
               <th>Add</th>
               <th>Total</th>
-              <th>B.B.F</th>
+              <th>Closing</th>
               <th>Sales</th>
               <th>Price</th>
               <th>Amount</th>
@@ -54,7 +54,7 @@ export default function BarStockGrid({ entries, onChange }: Props) {
             {entries.map((row) => (
               <tr key={row.item_id}>
                 <td>{row.name}</td>
-                <td>{formatBarCell(row.opening_stock)}</td>
+                <td>{formatSnacksCell(row.previous_closing)}</td>
                 <td>
                   <input
                     type="number"
@@ -69,7 +69,7 @@ export default function BarStockGrid({ entries, onChange }: Props) {
                     }
                   />
                 </td>
-                <td>{formatBarCell(row.total_units)}</td>
+                <td>{formatSnacksCell(row.total_units)}</td>
                 <td>
                   <input
                     type="number"
@@ -84,7 +84,7 @@ export default function BarStockGrid({ entries, onChange }: Props) {
                     }
                   />
                 </td>
-                <td>{formatBarCell(row.sold_units)}</td>
+                <td>{formatSnacksCell(row.sold_units)}</td>
                 <td>
                   {Number(row.price_ksh ?? 0).toLocaleString(undefined, {
                     minimumFractionDigits: 2,
@@ -104,7 +104,7 @@ export default function BarStockGrid({ entries, onChange }: Props) {
           </tbody>
         </table>
       </div>
-      <StockEntryCards rows={cardRows} formatCell={formatBarCell} onChange={onChange} />
+      <StockEntryCards rows={cardRows} formatCell={formatSnacksCell} onChange={onChange} />
     </div>
   );
 }

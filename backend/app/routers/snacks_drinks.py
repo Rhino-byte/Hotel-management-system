@@ -1,7 +1,7 @@
 from datetime import date
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 
 from app.deps import CurrentUser, require_module
 from app.schemas.daily import DailyStockPayload
@@ -17,8 +17,12 @@ def get_snacks_drinks(
     entry_date: date = Query(..., alias="date"),
 ):
     rows = daily_db.get_snacks_drinks_daily(entry_date)
-    total_sold_units = sum(float(r.get("sold_units", 0)) for r in rows)
-    total_revenue = sum(float(r.get("revenue", 0)) for r in rows)
+    total_sold_units = sum(
+        float(r["sold_units"]) for r in rows if r.get("sold_units") is not None
+    )
+    total_revenue = sum(
+        float(r["revenue"]) for r in rows if r.get("revenue") is not None
+    )
     return {
         "date": str(entry_date),
         "entries": rows,
@@ -32,6 +36,8 @@ def save_snacks_drinks(
     payload: DailyStockPayload,
     user: Annotated[CurrentUser, Depends(require_module(MODULE_SNACKS_DRINKS))],
 ):
+    if not payload.entries:
+        raise HTTPException(status_code=400, detail="No entries to save")
     entries = [e.model_dump() for e in payload.entries]
     saved = daily_db.save_snacks_drinks_daily(payload.date, entries, user.user_id)
     return {"saved": saved, "date": str(payload.date)}

@@ -35,14 +35,36 @@ def log_audit(
     )
 
 
+def _compute_snacks_metrics(record: dict[str, Any]) -> dict[str, Any]:
+    previous_closing = float(record.get("previous_closing") or 0)
+    added_raw = record.get("added_stock")
+    closing_raw = record.get("closing_stock")
+    added = float(added_raw) if added_raw is not None else 0.0
+    total_units = previous_closing + added
+    price_ksh = float(record.get("price_ksh") or 0)
+    record["total_units"] = total_units
+    if closing_raw is None:
+        record["sold_units"] = None
+        record["revenue"] = None
+    else:
+        closing = float(closing_raw)
+        sold_units = max(total_units - closing, 0.0)
+        record["sold_units"] = sold_units
+        record["revenue"] = sold_units * price_ksh
+    if record.get("previous_from_date") is not None:
+        record["previous_from_date"] = str(record["previous_from_date"])
+    return record
+
+
 def get_snacks_drinks_daily(entry_date: date) -> list[dict[str, Any]]:
     with get_conn() as conn:
         rows = conn.execute(
             """
             SELECT i.id AS item_id, i.name,
-                   COALESCE(d.closing_stock, 0) AS closing_stock,
-                   COALESCE(d.added_stock, 0) AS added_stock,
-                   COALESCE(n.closing_stock, 0) AS next_closing_units,
+                   COALESCE(prev.closing_stock, 0) AS previous_closing,
+                   prev.previous_from_date,
+                   cur.added_stock,
+                   cur.closing_stock,
                    COALESCE(
                      (SELECT ip.price_ksh FROM item_prices ip
                       WHERE ip.item_id = i.id
@@ -50,29 +72,24 @@ def get_snacks_drinks_daily(entry_date: date) -> list[dict[str, Any]]:
                       LIMIT 1),
                      0
                    ) AS price_ksh,
-                   d.id AS record_id
+                   cur.id AS record_id
             FROM items i
-            LEFT JOIN snacks_drinks_daily d
-              ON d.item_id = i.id AND d.entry_date = %s
-            LEFT JOIN snacks_drinks_daily n
-              ON n.item_id = i.id AND n.entry_date = (%s::date + INTERVAL '1 day')::date
+            LEFT JOIN snacks_drinks_daily cur
+              ON cur.item_id = i.id AND cur.entry_date = %s
+            LEFT JOIN LATERAL (
+              SELECT p.closing_stock, p.entry_date AS previous_from_date
+              FROM snacks_drinks_daily p
+              WHERE p.item_id = i.id
+                AND p.entry_date < %s
+              ORDER BY p.entry_date DESC
+              LIMIT 1
+            ) prev ON true
             WHERE i.group_type = 'snacks_drinks' AND i.is_active = TRUE
             ORDER BY i.name
             """,
             (entry_date, entry_date),
         ).fetchall()
-        result: list[dict[str, Any]] = []
-        for row in rows:
-            record = dict(row)
-            opening_units = float(record["closing_stock"]) + float(record["added_stock"])
-            next_closing_units = float(record["next_closing_units"])
-            sold_units = max(opening_units - next_closing_units, 0.0)
-            price_ksh = float(record["price_ksh"])
-            record["opening_units"] = opening_units
-            record["sold_units"] = sold_units
-            record["revenue"] = sold_units * price_ksh
-            result.append(record)
-        return result
+        return [_compute_snacks_metrics(dict(row)) for row in rows]
 
 
 def save_snacks_drinks_daily(
@@ -624,8 +641,9 @@ def get_inventory_audit(
         result = [dict(r) for r in rows]
         if group == "snacks_drinks":
             for row in result:
-                opening_units = float(row["closing_stock"]) + float(row["added_stock"])
-                sold_units = max(opening_units - float(row["next_closing_units"]), 0.0)
+                total_units = float(row["opening_stock"]) + float(row["added_stock"])
+                sold_units = max(total_units - float(row["closing_stock"]), 0.0)
+                row["total_units"] = total_units
                 row["sold_units"] = sold_units
                 row["revenue"] = sold_units * float(row["price_ksh"])
         return result
