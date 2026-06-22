@@ -155,6 +155,28 @@ def save_snacks_drinks_daily(
     return saved
 
 
+def is_food_kuku_day_locked(entry_date: date) -> bool:
+    with get_conn() as conn:
+        row = conn.execute(
+            "SELECT 1 FROM food_kuku_day_lock WHERE entry_date = %s",
+            (entry_date,),
+        ).fetchone()
+        return row is not None
+
+
+def lock_food_kuku_day(entry_date: date, user_id: int) -> None:
+    with get_conn() as conn:
+        conn.execute(
+            """
+            INSERT INTO food_kuku_day_lock (entry_date, locked_by)
+            VALUES (%s, %s)
+            ON CONFLICT (entry_date) DO NOTHING
+            """,
+            (entry_date, user_id),
+        )
+        conn.commit()
+
+
 def get_food_kuku_daily(entry_date: date) -> list[dict[str, Any]]:
     with get_conn() as conn:
         rows = conn.execute(
@@ -181,7 +203,11 @@ def get_food_kuku_daily(entry_date: date) -> list[dict[str, Any]]:
 
 
 def save_food_kuku_daily(
-    entry_date: date, entries: list[dict[str, Any]], user_id: int
+    entry_date: date,
+    entries: list[dict[str, Any]],
+    user_id: int,
+    *,
+    finalize: bool = False,
 ) -> dict[str, Any]:
     saved = 0
     total_revenue = 0.0
@@ -254,8 +280,17 @@ def save_food_kuku_daily(
                     changed_by=user_id,
                 )
             saved += 1
+        if finalize:
+            conn.execute(
+                """
+                INSERT INTO food_kuku_day_lock (entry_date, locked_by)
+                VALUES (%s, %s)
+                ON CONFLICT (entry_date) DO NOTHING
+                """,
+                (entry_date, user_id),
+            )
         conn.commit()
-    return {"saved": saved, "total_revenue": total_revenue}
+    return {"saved": saved, "total_revenue": total_revenue, "locked": finalize}
 
 
 def get_stock_items_daily(entry_date: date) -> list[dict[str, Any]]:

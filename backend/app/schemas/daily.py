@@ -23,6 +23,7 @@ class DailyStockPayload(BaseModel):
 class DailyQuantityPayload(BaseModel):
     date: date
     entries: List[QuantityEntry]
+    finalize: bool = False
 
 
 class BarStockEntry(BaseModel):

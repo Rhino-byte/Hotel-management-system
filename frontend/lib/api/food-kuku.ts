@@ -6,14 +6,24 @@ export async function fetchFoodKuku(date: string) {
     date: string;
     entries: QuantityEntry[];
     total_revenue: number;
+    locked: boolean;
   }>(`/api/food-kuku?date=${encodeURIComponent(date)}`);
 }
 
-export async function saveFoodKuku(date: string, entries: QuantityEntry[]) {
-  return apiFetch<{ saved: number; total_revenue: number }>("/api/food-kuku", {
+export async function saveFoodKuku(
+  date: string,
+  entries: QuantityEntry[],
+  options?: { finalize?: boolean }
+) {
+  return apiFetch<{
+    saved: number;
+    total_revenue: number;
+    locked: boolean;
+  }>("/api/food-kuku", {
     method: "POST",
     body: JSON.stringify({
       date,
+      finalize: options?.finalize ?? false,
       entries: entries.map((e) => ({
         item_id: e.item_id,
         quantity: e.quantity ?? 0,

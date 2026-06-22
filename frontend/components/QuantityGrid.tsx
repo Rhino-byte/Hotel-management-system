@@ -6,9 +6,10 @@ type Props = {
   entries: QuantityEntry[];
   onChange: (itemId: number, quantity: number) => void;
   totalRevenue: number;
+  readOnly?: boolean;
 };
 
-export default function QuantityGrid({ entries, onChange, totalRevenue }: Props) {
+export default function QuantityGrid({ entries, onChange, totalRevenue, readOnly = false }: Props) {
   return (
     <>
       <div className="revenue-banner">
@@ -33,16 +34,20 @@ export default function QuantityGrid({ entries, onChange, totalRevenue }: Props)
                   <td>{row.name}</td>
                   <td>{row.price_ksh}</td>
                   <td>
-                    <input
-                      type="number"
-                      min={0}
-                      step={1}
-                      className="input-cell"
-                      value={row.quantity}
-                      onChange={(e) =>
-                        onChange(row.item_id, Number(e.target.value) || 0)
-                      }
-                    />
+                    {readOnly ? (
+                      row.quantity
+                    ) : (
+                      <input
+                        type="number"
+                        min={0}
+                        step={1}
+                        className="input-cell"
+                        value={row.quantity}
+                        onChange={(e) =>
+                          onChange(row.item_id, Number(e.target.value) || 0)
+                        }
+                      />
+                    )}
                   </td>
                   <td>{sub.toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
                 </tr>
