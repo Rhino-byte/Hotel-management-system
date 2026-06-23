@@ -125,7 +125,7 @@ def list_all_items_with_prices() -> list[dict[str, Any]]:
     with get_conn() as conn:
         rows = conn.execute(
             """
-            SELECT i.id, i.name, i.group_type, i.is_active,
+            SELECT i.id, i.name, i.group_type, i.subcategory, i.is_active,
                    COALESCE(
                      (SELECT ip.price_ksh FROM item_prices ip
                       WHERE ip.item_id = i.id
@@ -140,7 +140,7 @@ def list_all_items_with_prices() -> list[dict[str, Any]]:
             FROM items i
             WHERE i.is_active = TRUE
               AND i.group_type IN ('snacks_drinks', 'food_kuku', 'bar')
-            ORDER BY i.group_type, i.display_order, i.name
+            ORDER BY i.group_type, i.subcategory NULLS LAST, i.display_order, i.name
             """
         ).fetchall()
         return [dict(r) for r in rows]
@@ -160,19 +160,44 @@ def update_item_price(item_id: int, price_ksh: float, user_id: int) -> dict[str,
         return dict(row)
 
 
+def update_item_subcategory(item_id: int, subcategory: str) -> dict[str, Any]:
+    if subcategory not in ("snacks", "drinks"):
+        raise ValueError("subcategory must be 'snacks' or 'drinks'")
+    with get_conn() as conn:
+        row = conn.execute(
+            """
+            UPDATE items
+            SET subcategory = %s
+            WHERE id = %s AND group_type = 'snacks_drinks'
+            RETURNING id, name, group_type, subcategory
+            """,
+            (subcategory, item_id),
+        ).fetchone()
+        if not row:
+            raise LookupError("Item not found or not snacks_drinks")
+        conn.commit()
+        return dict(row)
+
+
 def upsert_catalog_item(
-    group_type: str, name: str, price_ksh: float, display_order: int = 0
+    group_type: str,
+    name: str,
+    price_ksh: float,
+    display_order: int = 0,
+    subcategory: Optional[str] = None,
 ) -> int:
     with get_conn() as conn:
         row = conn.execute(
             """
-            INSERT INTO items (name, group_type, is_active, display_order)
-            VALUES (%s, %s, TRUE, %s)
+            INSERT INTO items (name, group_type, is_active, display_order, subcategory)
+            VALUES (%s, %s, TRUE, %s, %s)
             ON CONFLICT (group_type, name) DO UPDATE
-              SET is_active = TRUE, display_order = EXCLUDED.display_order
+              SET is_active = TRUE,
+                  display_order = EXCLUDED.display_order,
+                  subcategory = COALESCE(EXCLUDED.subcategory, items.subcategory)
             RETURNING id
             """,
-            (name, group_type, display_order),
+            (name, group_type, display_order, subcategory),
         ).fetchone()
         item_id = row["id"]
         existing = conn.execute(

@@ -3,7 +3,12 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, HTTPException
 
 from app.deps import CurrentUser, require_admin
-from app.schemas.admin import HotelRoleUpdatePayload, PriceUpdatePayload, StockItemPayload
+from app.schemas.admin import (
+    HotelRoleUpdatePayload,
+    PriceUpdatePayload,
+    StockItemPayload,
+    SubcategoryUpdatePayload,
+)
 from core.roles import ALL_ROLES, ROLE_ADMIN
 from db import admin_audit as admin_audit_db
 from db import items as items_db
@@ -32,6 +37,25 @@ def update_price(
         details={"price_ksh": payload.price_ksh},
     )
     return {"updated": True, "price": row}
+
+
+@router.put("/prices/subcategory")
+def update_subcategory(
+    payload: SubcategoryUpdatePayload,
+    admin: Annotated[CurrentUser, Depends(require_admin)],
+):
+    try:
+        row = items_db.update_item_subcategory(payload.item_id, payload.subcategory)
+    except LookupError:
+        raise HTTPException(status_code=404, detail="Item not found or not snacks_drinks")
+    admin_audit_db.log_admin_action(
+        action_type="item.subcategory.update",
+        performed_by=admin.user_id,
+        target_type="item",
+        target_id=payload.item_id,
+        details={"subcategory": payload.subcategory},
+    )
+    return {"updated": True, "item": row}
 
 
 @router.get("/items/stock")

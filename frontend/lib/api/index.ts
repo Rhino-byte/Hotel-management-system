@@ -7,6 +7,7 @@ export { fetchStockItems, saveStockItems } from "./stock-items";
 export {
   fetchPrices,
   updatePrice,
+  updateItemSubcategory,
   fetchStockCatalog,
   addStockCatalogItem,
   fetchInventoryAudit,

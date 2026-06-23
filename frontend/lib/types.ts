@@ -19,9 +19,12 @@ export type EmployeeRow = {
   effective_hotel_role: string | null;
 };
 
+export type ItemSubcategory = "snacks" | "drinks";
+
 export type SnacksEntry = {
   item_id: number;
   name: string;
+  subcategory: ItemSubcategory;
   previous_closing: number;
   previous_from_date?: string | null;
   added_stock: number | null;
@@ -58,6 +61,7 @@ export type PriceItem = {
   id: number;
   name: string;
   group_type: string;
+  subcategory?: ItemSubcategory | null;
   price_ksh: number;
   price_id?: number | null;
 };

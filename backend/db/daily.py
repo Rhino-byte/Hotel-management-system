@@ -60,7 +60,7 @@ def get_snacks_drinks_daily(entry_date: date) -> list[dict[str, Any]]:
     with get_conn() as conn:
         rows = conn.execute(
             """
-            SELECT i.id AS item_id, i.name,
+            SELECT i.id AS item_id, i.name, i.subcategory,
                    COALESCE(prev.closing_stock, 0) AS previous_closing,
                    prev.entry_date AS previous_from_date,
                    cur.added_stock,
@@ -80,7 +80,7 @@ def get_snacks_drinks_daily(entry_date: date) -> list[dict[str, Any]]:
               ON prev.item_id = i.id
              AND prev.entry_date = (%s::date - INTERVAL '1 day')::date
             WHERE i.group_type = 'snacks_drinks' AND i.is_active = TRUE
-            ORDER BY i.name
+            ORDER BY i.subcategory NULLS LAST, i.display_order, i.name
             """,
             (entry_date, entry_date),
         ).fetchall()

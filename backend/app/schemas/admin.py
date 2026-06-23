@@ -8,6 +8,11 @@ class PriceUpdatePayload(BaseModel):
     price_ksh: float = Field(gt=0)
 
 
+class SubcategoryUpdatePayload(BaseModel):
+    item_id: int
+    subcategory: str = Field(pattern="^(snacks|drinks)$")
+
+
 class StockItemPayload(BaseModel):
     name: str = Field(min_length=1)
 

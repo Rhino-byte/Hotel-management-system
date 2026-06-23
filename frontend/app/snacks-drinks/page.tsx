@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import SnacksSavePreview from "../../components/SnacksSavePreview";
 import SnacksStockGrid from "../../components/SnacksStockGrid";
 import LoadingScreen from "../../components/LoadingScreen";
@@ -9,26 +9,21 @@ import SavingOverlay from "../../components/SavingOverlay";
 import { fetchSnacksDrinks, saveSnacksDrinks, todayIso } from "../../lib/api";
 import { recomputeSnacksEntry, snacksTotals } from "../../lib/snacks-utils";
 import { useRequireAuth } from "../../lib/auth";
-import type { SnacksEntry } from "../../lib/types";
+import type { SnacksEntry, ItemSubcategory } from "../../lib/types";
+
+type SnacksTab = ItemSubcategory | "all";
 
 export default function SnacksDrinksPage() {
   const { user, loading } = useRequireAuth(["snacks_drinks"]);
   const [date, setDate] = useState(todayIso());
   const [query, setQuery] = useState("");
+  const [activeTab, setActiveTab] = useState<SnacksTab>("all");
   const [entries, setEntries] = useState<SnacksEntry[]>([]);
   const [dirtyIds, setDirtyIds] = useState<Set<number>>(new Set());
-  const [totalSoldUnits, setTotalSoldUnits] = useState(0);
-  const [totalRevenue, setTotalRevenue] = useState(0);
   const [saving, setSaving] = useState(false);
   const [previewOpen, setPreviewOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
-
-  const applyTotals = useCallback((list: SnacksEntry[]) => {
-    const t = snacksTotals(list);
-    setTotalSoldUnits(t.totalSoldUnits);
-    setTotalRevenue(t.totalRevenue);
-  }, []);
 
   useEffect(() => {
     if (loading || !user) return;
@@ -38,10 +33,9 @@ export default function SnacksDrinksPage() {
       .then((d) => {
         const normalized = d.entries.map((e) => recomputeSnacksEntry(e));
         setEntries(normalized);
-        applyTotals(normalized);
       })
       .catch((e) => setError(e.message));
-  }, [date, loading, user, applyTotals]);
+  }, [date, loading, user]);
 
   const onChange = (
     itemId: number,
@@ -52,7 +46,6 @@ export default function SnacksDrinksPage() {
       const next = prev.map((e) =>
         e.item_id === itemId ? recomputeSnacksEntry({ ...e, [field]: value }) : e
       );
-      applyTotals(next);
       return next;
     });
     setDirtyIds((prev) => new Set(prev).add(itemId));
@@ -80,7 +73,6 @@ export default function SnacksDrinksPage() {
       const refreshed = await fetchSnacksDrinks(date);
       const normalized = refreshed.entries.map((e) => recomputeSnacksEntry(e));
       setEntries(normalized);
-      applyTotals(normalized);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Save failed");
     } finally {
@@ -90,9 +82,16 @@ export default function SnacksDrinksPage() {
 
   if (loading) return <LoadingScreen />;
 
-  const filteredEntries = entries.filter((e) =>
+  const tabEntries =
+    activeTab === "all"
+      ? entries
+      : entries.filter((e) => e.subcategory === activeTab);
+
+  const filteredEntries = tabEntries.filter((e) =>
     e.name.toLowerCase().includes(query.trim().toLowerCase())
   );
+
+  const tabTotals = snacksTotals(tabEntries);
 
   const carryDates = Array.from(
     new Set(
@@ -128,14 +127,37 @@ export default function SnacksDrinksPage() {
           </div>
         )}
         <div className="revenue-banner">
-          <span>Total items sold: {totalSoldUnits.toLocaleString()}</span>
+          <span>Total items sold: {tabTotals.totalSoldUnits.toLocaleString()}</span>
           <strong>
             Total sales (KSh):{" "}
-            {totalRevenue.toLocaleString(undefined, {
+            {tabTotals.totalRevenue.toLocaleString(undefined, {
               minimumFractionDigits: 2,
               maximumFractionDigits: 2,
             })}
           </strong>
+        </div>
+        <div className="bar-preview-tabs">
+          <button
+            type="button"
+            className={activeTab === "snacks" ? "bar-preview-tab active" : "bar-preview-tab"}
+            onClick={() => setActiveTab("snacks")}
+          >
+            Snacks
+          </button>
+          <button
+            type="button"
+            className={activeTab === "drinks" ? "bar-preview-tab active" : "bar-preview-tab"}
+            onClick={() => setActiveTab("drinks")}
+          >
+            Drinks
+          </button>
+          <button
+            type="button"
+            className={activeTab === "all" ? "bar-preview-tab active" : "bar-preview-tab"}
+            onClick={() => setActiveTab("all")}
+          >
+            All
+          </button>
         </div>
         <div className="filters">
           <label className="field">

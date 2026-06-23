@@ -1,4 +1,4 @@
-import type { AuditRow, PriceItem } from "../types";
+import type { AuditRow, ItemSubcategory, PriceItem } from "../types";
 import { apiFetch } from "./client";
 
 export async function fetchPrices() {
@@ -9,6 +9,13 @@ export async function updatePrice(itemId: number, priceKsh: number) {
   return apiFetch<{ updated: boolean }>("/api/prices", {
     method: "PUT",
     body: JSON.stringify({ item_id: itemId, price_ksh: priceKsh }),
+  });
+}
+
+export async function updateItemSubcategory(itemId: number, subcategory: ItemSubcategory) {
+  return apiFetch<{ updated: boolean }>("/api/prices/subcategory", {
+    method: "PUT",
+    body: JSON.stringify({ item_id: itemId, subcategory }),
   });
 }
 

@@ -38,9 +38,15 @@ def main() -> None:
         else:
             continue
         for name, price in items.items():
-            upsert_catalog_item(group, name, float(price))
+            subcategory = None
+            if category == "Snacks":
+                subcategory = "snacks"
+            elif category == "Drinks":
+                subcategory = "drinks"
+            upsert_catalog_item(group, name, float(price), subcategory=subcategory)
             count += 1
-            print(f"  {group}: {name} @ {price}")
+            label = f"{subcategory}" if subcategory else group
+            print(f"  {label}: {name} @ {price}")
 
     for name in STOCK_STARTER_ITEMS:
         upsert_catalog_item("stock", name, 0.0)
