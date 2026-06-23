@@ -62,7 +62,7 @@ def get_snacks_drinks_daily(entry_date: date) -> list[dict[str, Any]]:
             """
             SELECT i.id AS item_id, i.name,
                    COALESCE(prev.closing_stock, 0) AS previous_closing,
-                   prev.previous_from_date,
+                   prev.entry_date AS previous_from_date,
                    cur.added_stock,
                    cur.closing_stock,
                    COALESCE(
@@ -76,14 +76,9 @@ def get_snacks_drinks_daily(entry_date: date) -> list[dict[str, Any]]:
             FROM items i
             LEFT JOIN snacks_drinks_daily cur
               ON cur.item_id = i.id AND cur.entry_date = %s
-            LEFT JOIN LATERAL (
-              SELECT p.closing_stock, p.entry_date AS previous_from_date
-              FROM snacks_drinks_daily p
-              WHERE p.item_id = i.id
-                AND p.entry_date < %s
-              ORDER BY p.entry_date DESC
-              LIMIT 1
-            ) prev ON true
+            LEFT JOIN snacks_drinks_daily prev
+              ON prev.item_id = i.id
+             AND prev.entry_date = (%s::date - INTERVAL '1 day')::date
             WHERE i.group_type = 'snacks_drinks' AND i.is_active = TRUE
             ORDER BY i.name
             """,

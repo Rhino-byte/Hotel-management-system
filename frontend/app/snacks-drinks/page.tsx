@@ -110,7 +110,7 @@ export default function SnacksDrinksPage() {
           <div>
             <h1 className="page-title">Snacks &amp; Drinks</h1>
             <p className="page-subtitle">
-              Prev closing carries from the last saved closing before this date. Total = Prev
+              Prev closing uses yesterday&apos;s saved entry only (not older dates). Total = Prev
               closing + Add. Sales = Total − Closing (same day). Preview before save — only edited
               rows are written.
             </p>
