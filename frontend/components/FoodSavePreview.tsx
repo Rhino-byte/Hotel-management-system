@@ -7,6 +7,7 @@ type Props = {
   date: string;
   entries: QuantityEntry[];
   mode?: "review" | "summary";
+  hasPendingChanges?: boolean;
   saving?: boolean;
   onCancel: () => void;
   onConfirm?: () => void;
@@ -56,13 +57,15 @@ export default function FoodSavePreview({
   date,
   entries,
   mode = "review",
+  hasPendingChanges = false,
   saving = false,
   onCancel,
   onConfirm,
 }: Props) {
   const { kuku, food } = splitFoodPreview(entries);
   const grandTotal = groupRevenue(entries);
-  const canConfirm = mode === "review" && entries.length > 0 && Boolean(onConfirm);
+  const canConfirm =
+    mode === "review" && (entries.length > 0 || hasPendingChanges) && Boolean(onConfirm);
   const isSummary = mode === "summary";
 
   return (
@@ -102,7 +105,11 @@ export default function FoodSavePreview({
 
         {kuku.length === 0 && food.length === 0 ? (
           <p className="empty-state">
-            {isSummary ? "No sold dishes for this day." : "No edited dishes."}
+            {isSummary
+              ? "No sold dishes for this day."
+              : hasPendingChanges
+                ? "No sold dishes in this save. Previously saved entries cleared to zero will be removed."
+                : "No edited dishes."}
           </p>
         ) : (
           <>

@@ -227,6 +227,36 @@ def save_food_kuku_daily(
         for entry in entries:
             item_id = int(entry["item_id"])
             quantity = float(entry.get("quantity") or 0)
+            existing = conn.execute(
+                """
+                SELECT id, quantity FROM food_kuku_daily
+                WHERE entry_date = %s AND item_id = %s
+                """,
+                (entry_date, item_id),
+            ).fetchone()
+
+            if quantity <= 0:
+                if not existing:
+                    continue
+                record_id = existing["id"]
+                log_audit(
+                    conn,
+                    table_name="food_kuku_daily",
+                    record_id=record_id,
+                    item_id=item_id,
+                    entry_date=entry_date,
+                    field_name="quantity",
+                    old_value=existing["quantity"],
+                    new_value=0,
+                    changed_by=user_id,
+                )
+                conn.execute(
+                    "DELETE FROM food_kuku_daily WHERE id = %s",
+                    (record_id,),
+                )
+                saved += 1
+                continue
+
             price_row = conn.execute(
                 """
                 SELECT COALESCE(
@@ -241,13 +271,7 @@ def save_food_kuku_daily(
             ).fetchone()
             price = float(price_row["price_ksh"])
             total_revenue += quantity * price
-            existing = conn.execute(
-                """
-                SELECT id, quantity FROM food_kuku_daily
-                WHERE entry_date = %s AND item_id = %s
-                """,
-                (entry_date, item_id),
-            ).fetchone()
+
             if existing:
                 record_id = existing["id"]
                 if float(existing["quantity"]) != quantity:

@@ -82,12 +82,15 @@ export default function FoodKukuPage() {
 
   const onConfirmSave = async () => {
     const dirtyEntries = entries.filter((e) => dirtyIds.has(e.item_id));
+    const toPersist = dirtyEntries.filter(
+      (e) => e.quantity > 0 || (baseline.get(e.item_id) ?? 0) > 0
+    );
     const finalize = user?.role === "food_clerk";
     setSaving(true);
     setError(null);
     setMessage(null);
     try {
-      const res = await saveFoodKuku(date, dirtyEntries, { finalize });
+      const res = await saveFoodKuku(date, toPersist, { finalize });
       setMessage(
         `Saved ${res.saved} item(s). Revenue: KSh ${res.total_revenue.toLocaleString(undefined, { minimumFractionDigits: 2 })}${res.locked ? " — day finalized." : ""}`
       );
@@ -134,7 +137,9 @@ export default function FoodKukuPage() {
   const dirtyEntries = entries.filter((e) => dirtyIds.has(e.item_id));
   const lockedSummaryEntries = entries.filter((e) => e.quantity > 0);
   const previewMode = isClerkLocked ? "summary" : "review";
-  const previewEntries = isClerkLocked ? lockedSummaryEntries : dirtyEntries;
+  const previewEntries = isClerkLocked
+    ? lockedSummaryEntries
+    : dirtyEntries.filter((e) => e.quantity > 0);
 
   const filteredEntries = entries.filter((e) =>
     e.name.toLowerCase().includes(query.trim().toLowerCase())
@@ -221,6 +226,7 @@ export default function FoodKukuPage() {
           date={date}
           entries={previewEntries}
           mode={previewMode}
+          hasPendingChanges={dirtyIds.size > 0}
           saving={saving}
           onCancel={() => setPreviewOpen(false)}
           onConfirm={onConfirmSave}
