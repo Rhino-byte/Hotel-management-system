@@ -8,6 +8,7 @@ export {
   fetchPrices,
   updatePrice,
   updateItemSubcategory,
+  addSnacksDrinksItem,
   fetchStockCatalog,
   addStockCatalogItem,
   fetchInventoryAudit,

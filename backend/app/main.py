@@ -1,12 +1,15 @@
-import os
+import logging
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 
 from app.config import cors_origins, is_production, validate_settings
 from app.routers import admin, auth, bar, food_kuku, health, inventory, snacks_drinks, stock_items
 from db.connection import close_pool, init_pool, load_env_file
+
+logger = logging.getLogger("hotel_api")
 
 load_env_file()
 validate_settings()
@@ -28,6 +31,23 @@ app = FastAPI(
     redoc_url=None if _prod else "/redoc",
     openapi_url=None if _prod else "/openapi.json",
 )
+
+
+@app.exception_handler(Exception)
+async def unhandled_exception_handler(request: Request, exc: Exception):
+    logger.error("Unhandled error on %s %s", request.method, request.url.path, exc_info=exc)
+    if is_production():
+        return JSONResponse(
+            status_code=500,
+            content={"detail": "Internal server error"},
+        )
+    return JSONResponse(
+        status_code=500,
+        content={
+            "detail": str(exc) or "Internal server error",
+            "type": type(exc).__name__,
+        },
+    )
 
 
 @app.get("/")

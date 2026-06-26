@@ -1,7 +1,12 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { fetchPrices, updateItemSubcategory, updatePrice } from "../../../lib/api";
+import { FormEvent, useEffect, useState } from "react";
+import {
+  addSnacksDrinksItem,
+  fetchPrices,
+  updateItemSubcategory,
+  updatePrice,
+} from "../../../lib/api";
 import { useRequireAuth } from "../../../lib/auth";
 import type { ItemSubcategory, PriceItem } from "../../../lib/types";
 import LoadingScreen from "../../../components/LoadingScreen";
@@ -12,16 +17,23 @@ export default function AdminPricesPage() {
   const { user, loading } = useRequireAuth(undefined, true);
   const [items, setItems] = useState<PriceItem[]>([]);
   const [query, setQuery] = useState("");
+  const [newName, setNewName] = useState("");
+  const [newPrice, setNewPrice] = useState("");
+  const [newSubcategory, setNewSubcategory] = useState<ItemSubcategory>("snacks");
+  const [addingItem, setAddingItem] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [savingId, setSavingId] = useState<number | null>(null);
   const [savingSubcategoryId, setSavingSubcategoryId] = useState<number | null>(null);
 
-  useEffect(() => {
-    if (loading || !user || user.role !== "admin") return;
+  const loadItems = () =>
     fetchPrices()
       .then((d) => setItems(d.items))
       .catch((e) => setError(e.message));
+
+  useEffect(() => {
+    if (loading || !user || user.role !== "admin") return;
+    loadItems();
   }, [loading, user]);
 
   if (loading) return <LoadingScreen />;
@@ -62,18 +74,76 @@ export default function AdminPricesPage() {
     }
   };
 
+  const onAddSnacksDrinks = async (e: FormEvent) => {
+    e.preventDefault();
+    const name = newName.trim();
+    const price = Number(newPrice);
+    if (!name || price <= 0) {
+      setError("Enter an item name and a price greater than zero.");
+      return;
+    }
+    setAddingItem(true);
+    setError(null);
+    setMessage(null);
+    try {
+      const res = await addSnacksDrinksItem(name, price, newSubcategory);
+      setNewName("");
+      setNewPrice("");
+      setMessage(
+        `Added ${res.item.name} (${res.item.subcategory}) at KSh ${res.item.price_ksh.toLocaleString()}.`
+      );
+      await loadItems();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to add item");
+    } finally {
+      setAddingItem(false);
+    }
+  };
+
+  const isBusy = savingId !== null || savingSubcategoryId !== null || addingItem;
+
   return (
     <main className="page">
-      <div className={`card card-wide${savingId !== null || savingSubcategoryId !== null ? " card-saving" : ""}`}>
-        {savingId !== null && <SavingOverlay />}
+      <div className={`card card-wide${isBusy ? " card-saving" : ""}`}>
+        {isBusy && <SavingOverlay text={addingItem ? "Adding item" : undefined} />}
         <div className="page-header">
           <div>
             <h1 className="page-title">Price Management</h1>
-            <p className="page-subtitle">Search and update item prices quickly.</p>
+            <p className="page-subtitle">
+              Search and update prices, or add new snacks and drinks items.
+            </p>
           </div>
         </div>
         {error && <div className="alert error">{error}</div>}
         {message && <div className="alert success">{message}</div>}
+        <form onSubmit={onAddSnacksDrinks} className="form-inline">
+          <input
+            type="text"
+            placeholder="New item name"
+            value={newName}
+            onChange={(e) => setNewName(e.target.value)}
+            required
+          />
+          <input
+            type="number"
+            min={1}
+            step={1}
+            placeholder="Price (KSh)"
+            value={newPrice}
+            onChange={(e) => setNewPrice(e.target.value)}
+            required
+          />
+          <select
+            value={newSubcategory}
+            onChange={(e) => setNewSubcategory(e.target.value as ItemSubcategory)}
+          >
+            <option value="snacks">Snacks</option>
+            <option value="drinks">Drinks</option>
+          </select>
+          <button type="submit" className="btn btn-primary" disabled={addingItem}>
+            Add snack / drink
+          </button>
+        </form>
         <div className="filters">
           <label className="field">
             <span>Search item</span>

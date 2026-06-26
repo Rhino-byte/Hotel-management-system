@@ -17,6 +17,12 @@ class StockItemPayload(BaseModel):
     name: str = Field(min_length=1)
 
 
+class SnacksDrinksItemPayload(BaseModel):
+    name: str = Field(min_length=1)
+    price_ksh: float = Field(gt=0)
+    subcategory: str = Field(pattern="^(snacks|drinks)$")
+
+
 class FoodDishPayload(BaseModel):
     name: str = Field(min_length=1)
     price_ksh: float = Field(gt=0)

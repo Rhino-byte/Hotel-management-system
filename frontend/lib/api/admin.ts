@@ -19,6 +19,19 @@ export async function updateItemSubcategory(itemId: number, subcategory: ItemSub
   });
 }
 
+export async function addSnacksDrinksItem(
+  name: string,
+  priceKsh: number,
+  subcategory: ItemSubcategory
+) {
+  return apiFetch<{
+    item: { id: number; name: string; price_ksh: number; subcategory: ItemSubcategory };
+  }>("/api/items/snacks-drinks", {
+    method: "POST",
+    body: JSON.stringify({ name, price_ksh: priceKsh, subcategory }),
+  });
+}
+
 export async function fetchStockCatalog() {
   return apiFetch<{ items: { id: number; name: string; is_active: boolean }[] }>(
     "/api/items/stock"

@@ -1,9 +1,26 @@
-// Use same-origin /api in the browser (proxied by next.config rewrites in dev).
-// Falls back to explicit backend URL for direct calls or server-side use.
+// Prefer direct Render API in production when NEXT_PUBLIC_API_BASE is set.
+// Fall back to same-origin /api (Next.js rewrites) for local dev without the env var.
+const configured = (process.env.NEXT_PUBLIC_API_BASE || "").replace(/\/$/, "");
 const API_BASE =
-  typeof window !== "undefined"
-    ? ""
-    : (process.env.NEXT_PUBLIC_API_BASE || "http://localhost:8000").replace(/\/$/, "");
+  configured || (typeof window !== "undefined" ? "" : "http://localhost:8000");
+
+function formatApiError(
+  status: number,
+  body: { detail?: string | { msg?: string }[] },
+  target: string
+): string {
+  let detail: string | undefined;
+  if (typeof body.detail === "string") {
+    detail = body.detail;
+  } else if (Array.isArray(body.detail)) {
+    detail = body.detail.map((e) => e.msg).filter(Boolean).join(", ");
+  }
+  const base = detail || `HTTP ${status} for ${target}`;
+  if (status >= 500) {
+    return `${base} — Server error. Check API health or contact admin.`;
+  }
+  return base;
+}
 
 export function getToken(): string | null {
   if (typeof window === "undefined") return null;
@@ -24,7 +41,11 @@ export async function apiFetch<T>(path: string, options: RequestInit = {}): Prom
   };
   if (token) headers.Authorization = `Bearer ${token}`;
 
-  const res = await fetch(`${API_BASE}${path}`, { ...options, headers });
+  const res = await fetch(`${API_BASE}${path}`, {
+    ...options,
+    headers,
+    cache: "no-store",
+  });
   if (res.status === 401 && typeof window !== "undefined") {
     const body = await res.json().catch(() => ({}));
     const detail =
@@ -43,8 +64,8 @@ export async function apiFetch<T>(path: string, options: RequestInit = {}): Prom
   }
   if (!res.ok) {
     const body = await res.json().catch(() => ({}));
-    const target = `${API_BASE || window.location.origin}${path}`;
-    throw new Error(body.detail || `HTTP ${res.status} for ${target}`);
+    const target = `${API_BASE || (typeof window !== "undefined" ? window.location.origin : "")}${path}`;
+    throw new Error(formatApiError(res.status, body, target));
   }
   return res.json() as Promise<T>;
 }

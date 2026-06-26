@@ -6,6 +6,7 @@ from app.deps import CurrentUser, require_admin
 from app.schemas.admin import (
     HotelRoleUpdatePayload,
     PriceUpdatePayload,
+    SnacksDrinksItemPayload,
     StockItemPayload,
     SubcategoryUpdatePayload,
 )
@@ -56,6 +57,31 @@ def update_subcategory(
         details={"subcategory": payload.subcategory},
     )
     return {"updated": True, "item": row}
+
+
+@router.post("/items/snacks-drinks")
+def add_snacks_drinks_item(
+    payload: SnacksDrinksItemPayload,
+    admin: Annotated[CurrentUser, Depends(require_admin)],
+):
+    name = payload.name.strip()
+    if not name:
+        raise HTTPException(status_code=400, detail="Item name is required")
+    item = items_db.create_snacks_drinks_item(
+        name, payload.price_ksh, payload.subcategory, admin.user_id
+    )
+    admin_audit_db.log_admin_action(
+        action_type="snacks_drinks_item.create",
+        performed_by=admin.user_id,
+        target_type="item",
+        target_id=item["id"],
+        details={
+            "name": name,
+            "price_ksh": payload.price_ksh,
+            "subcategory": payload.subcategory,
+        },
+    )
+    return {"item": item}
 
 
 @router.get("/items/stock")
