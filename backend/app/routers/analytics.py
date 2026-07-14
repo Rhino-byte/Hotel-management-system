@@ -8,14 +8,15 @@ from db import analytics as analytics_db
 
 router = APIRouter(tags=["analytics"])
 
-RangeKey = Literal["today", "7d", "30d", "90d"]
+RangeKey = Literal["yesterday", "7d", "30d", "90d"]
 CategoryKey = Literal["snacks", "drinks", "food", "kuku"]
 
 
 def _range_to_dates(range_key: str) -> tuple[date, date]:
     today = date.today()
-    if range_key == "today":
-        return today, today
+    if range_key == "yesterday":
+        yesterday = today - timedelta(days=1)
+        return yesterday, yesterday
     if range_key == "7d":
         return today - timedelta(days=6), today
     if range_key == "30d":
@@ -28,17 +29,24 @@ def _range_to_dates(range_key: str) -> tuple[date, date]:
 @router.get("/analytics/sales-totals")
 def get_sales_totals(
     _admin: Annotated[CurrentUser, Depends(require_admin)],
-    range: RangeKey = Query("today", alias="range"),
+    range: RangeKey | None = Query(None, alias="range"),
+    entry_date: date | None = Query(None, alias="date"),
 ):
-    try:
-        date_from, date_to = _range_to_dates(range)
-    except ValueError:
-        raise HTTPException(
-            status_code=400,
-            detail="Invalid range. Use today, 7d, 30d, or 90d.",
-        )
+    if entry_date is not None:
+        date_from, date_to = entry_date, entry_date
+        range_out: str = "day"
+    else:
+        range_key = range or "yesterday"
+        try:
+            date_from, date_to = _range_to_dates(range_key)
+        except ValueError:
+            raise HTTPException(
+                status_code=400,
+                detail="Invalid range. Use yesterday, 7d, 30d, or 90d.",
+            )
+        range_out = range_key
     result = analytics_db.sales_totals(date_from, date_to)
-    return {"range": range, **result}
+    return {"range": range_out, **result}
 
 
 @router.get("/analytics/items-sold")

@@ -15,4 +15,4 @@ export {
   fetchEmployees,
   updateEmployeeHotelRole,
 } from "./admin";
-export { fetchSalesTotals, fetchItemsSold } from "./analytics";
+export { fetchSalesTotals, fetchDaySalesTotals, fetchItemsSold } from "./analytics";

@@ -11,7 +11,12 @@ import {
   YAxis,
 } from "recharts";
 import LoadingScreen from "../../../components/LoadingScreen";
-import { fetchItemsSold, fetchSalesTotals, todayIso } from "../../../lib/api";
+import {
+  fetchDaySalesTotals,
+  fetchItemsSold,
+  fetchSalesTotals,
+  todayIso,
+} from "../../../lib/api";
 import { useRequireAuth } from "../../../lib/auth";
 import type {
   AnalyticsCategory,
@@ -21,7 +26,7 @@ import type {
 } from "../../../lib/types";
 
 const RANGE_OPTIONS: { value: AnalyticsRange; label: string }[] = [
-  { value: "today", label: "Today" },
+  { value: "yesterday", label: "Yesterday" },
   { value: "7d", label: "7 days" },
   { value: "30d", label: "Month" },
   { value: "90d", label: "3 months" },
@@ -45,7 +50,7 @@ function formatKsh(value: number): string {
 
 export default function AdminAnalyticsPage() {
   const { user, loading } = useRequireAuth(undefined, true);
-  const [range, setRange] = useState<AnalyticsRange>("today");
+  const [range, setRange] = useState<AnalyticsRange>("yesterday");
   const [groups, setGroups] = useState<AnalyticsGroupTotal[]>([]);
   const [totalsMeta, setTotalsMeta] = useState<{ from: string; to: string } | null>(
     null
@@ -56,6 +61,9 @@ export default function AdminAnalyticsPage() {
   const [itemDate, setItemDate] = useState(todayIso());
   const [items, setItems] = useState<AnalyticsItemSold[]>([]);
   const [itemsLoading, setItemsLoading] = useState(false);
+
+  const [dayGroups, setDayGroups] = useState<AnalyticsGroupTotal[]>([]);
+  const [daySummaryLoading, setDaySummaryLoading] = useState(false);
 
   const [error, setError] = useState<string | null>(null);
 
@@ -82,10 +90,22 @@ export default function AdminAnalyticsPage() {
       .finally(() => setItemsLoading(false));
   }, [category, itemDate, loading, user]);
 
+  useEffect(() => {
+    if (loading || !user || user.role !== "admin") return;
+    setDaySummaryLoading(true);
+    setError(null);
+    fetchDaySalesTotals(itemDate)
+      .then((d) => setDayGroups(d.groups))
+      .catch((e) => setError(e.message))
+      .finally(() => setDaySummaryLoading(false));
+  }, [itemDate, loading, user]);
+
   if (loading) return <LoadingScreen />;
   if (!user || user.role !== "admin") return null;
 
   const chartHeight = Math.max(280, items.length * 36);
+  const dayGrandUnits = dayGroups.reduce((sum, g) => sum + Number(g.sold_units), 0);
+  const dayGrandRevenue = dayGroups.reduce((sum, g) => sum + Number(g.revenue), 0);
 
   return (
     <main className="page">
@@ -94,7 +114,7 @@ export default function AdminAnalyticsPage() {
           <div>
             <h1 className="page-title">Analytics</h1>
             <p className="page-subtitle">
-              Sales totals by group and items sold (quantity &gt; 1) for a selected day.
+              Sales totals by group, popular items for a selected day, and a daily summary.
             </p>
           </div>
         </div>
@@ -166,7 +186,7 @@ export default function AdminAnalyticsPage() {
 
         <section className="analytics-section">
           <div className="analytics-section-head">
-            <h2 className="analytics-section-title">Items sold (&gt; 1)</h2>
+            <h2 className="analytics-section-title">Popular items</h2>
             <div className="bar-preview-tabs">
               {CATEGORY_OPTIONS.map((opt) => (
                 <button
@@ -182,6 +202,7 @@ export default function AdminAnalyticsPage() {
               ))}
             </div>
           </div>
+          <p className="analytics-meta">Items sold more than once on the selected day.</p>
           <div className="filters">
             <label className="field">
               <span>Date</span>
@@ -195,7 +216,7 @@ export default function AdminAnalyticsPage() {
           {itemsLoading ? (
             <p className="empty-state">Loading items…</p>
           ) : items.length === 0 ? (
-            <p className="empty-state">No items sold more than 1 unit on this day.</p>
+            <p className="empty-state">No items sold more than once on this day.</p>
           ) : (
             <div className="analytics-chart" style={{ height: chartHeight }}>
               <ResponsiveContainer width="100%" height="100%">
@@ -239,6 +260,42 @@ export default function AdminAnalyticsPage() {
                   <Bar dataKey="sold_units" fill={BAR_COLOR} radius={[0, 4, 4, 0]} />
                 </BarChart>
               </ResponsiveContainer>
+            </div>
+          )}
+        </section>
+
+        <section className="analytics-section">
+          <div className="analytics-section-head">
+            <h2 className="analytics-section-title">Daily sales summary</h2>
+          </div>
+          <p className="analytics-meta">{itemDate}</p>
+          {daySummaryLoading ? (
+            <p className="empty-state">Loading summary…</p>
+          ) : (
+            <div className="table-wrap">
+              <table className="data-table">
+                <thead>
+                  <tr>
+                    <th>Group</th>
+                    <th>Units sold</th>
+                    <th>Revenue (KSh)</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {dayGroups.map((g) => (
+                    <tr key={g.key}>
+                      <td>{g.label}</td>
+                      <td>{Number(g.sold_units).toLocaleString()}</td>
+                      <td>{formatKsh(Number(g.revenue))}</td>
+                    </tr>
+                  ))}
+                  <tr className="analytics-summary-total">
+                    <td>Grand total</td>
+                    <td>{dayGrandUnits.toLocaleString()}</td>
+                    <td>{formatKsh(dayGrandRevenue)}</td>
+                  </tr>
+                </tbody>
+              </table>
             </div>
           )}
         </section>

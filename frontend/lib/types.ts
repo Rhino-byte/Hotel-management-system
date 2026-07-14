@@ -98,7 +98,7 @@ export type AuditRow = {
   revenue?: number;
 };
 
-export type AnalyticsRange = "today" | "7d" | "30d" | "90d";
+export type AnalyticsRange = "yesterday" | "7d" | "30d" | "90d";
 export type AnalyticsCategory = "snacks" | "drinks" | "food" | "kuku";
 
 export type AnalyticsGroupTotal = {
