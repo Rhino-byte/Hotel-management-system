@@ -4,6 +4,7 @@ import { useState } from "react";
 import {
   countBbfSet,
   formatBarCell,
+  overClosingDirtyEntries,
   soldOutDirtyEntries,
   unsetBbfWithStock,
 } from "../lib/bar-utils";
@@ -50,15 +51,18 @@ function ReportTable({
             const unsetWarn =
               warnUnset && !isRowBbfSet(row) && opening + added > 0;
             const highlight = highlightIds?.has(row.item_id);
+            const overClosing = row.over_closing === true;
             return (
               <tr
                 key={row.item_id}
                 className={
-                  highlight
-                    ? "bar-preview-row-dirty"
-                    : unsetWarn
-                      ? "bar-preview-row-warn"
-                      : undefined
+                  overClosing
+                    ? "bar-preview-row-warn"
+                    : highlight
+                      ? "bar-preview-row-dirty"
+                      : unsetWarn
+                        ? "bar-preview-row-warn"
+                        : undefined
                 }
               >
                 <td>{row.display_order ?? idx + 1}</td>
@@ -107,6 +111,7 @@ export default function BarSavePreview({
   const [soldOutAck, setSoldOutAck] = useState(false);
 
   const soldOutRows = soldOutDirtyEntries(entries, dirtyIds);
+  const overClosingRows = overClosingDirtyEntries(entries, dirtyIds);
   const dirtyEntries = entries.filter((e) => dirtyIds.has(e.item_id));
   const dirtyMissingBbf = dirtyEntries.filter((e) => !isRowBbfSet(e));
   const bbfSet = countBbfSet(entries);
@@ -115,6 +120,7 @@ export default function BarSavePreview({
   const canConfirm =
     dirtyIds.size > 0 &&
     dirtyMissingBbf.length === 0 &&
+    overClosingRows.length === 0 &&
     (!needsSoldOutAck || soldOutAck);
 
   return (
@@ -157,6 +163,14 @@ export default function BarSavePreview({
           <div className="alert error">
             {soldOutRows.length} item(s) marked sold out (B.B.F = 0 with stock remaining):{" "}
             {soldOutRows.map((r) => r.name).join(", ")}
+          </div>
+        )}
+
+        {overClosingRows.length > 0 && (
+          <div className="alert error">
+            {overClosingRows.length} item(s) have B.B.F greater than Total (impossible):{" "}
+            {overClosingRows.map((r) => r.name).join(", ")}. Reduce B.B.F or increase Add before
+            saving.
           </div>
         )}
 

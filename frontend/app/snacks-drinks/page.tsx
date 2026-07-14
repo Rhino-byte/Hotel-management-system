@@ -7,7 +7,7 @@ import LoadingScreen from "../../components/LoadingScreen";
 import SaveButton from "../../components/SaveButton";
 import SavingOverlay from "../../components/SavingOverlay";
 import { fetchSnacksDrinks, saveSnacksDrinks, todayIso } from "../../lib/api";
-import { recomputeSnacksEntry, snacksTotals } from "../../lib/snacks-utils";
+import { recomputeSnacksEntry, snacksTotals, overClosingDirtyEntries } from "../../lib/snacks-utils";
 import { useRequireAuth } from "../../lib/auth";
 import type { SnacksEntry, ItemSubcategory } from "../../lib/types";
 
@@ -56,7 +56,17 @@ export default function SnacksDrinksPage() {
       setError("No changes to save. Edit Add or Closing on items first.");
       return;
     }
-    setError(null);
+    const overRows = overClosingDirtyEntries(
+      entries.filter((e) => dirtyIds.has(e.item_id)),
+      dirtyIds
+    );
+    if (overRows.length > 0) {
+      setError(
+        `${overRows.length} item(s) have Closing greater than Total. Fix highlighted rows before saving.`
+      );
+    } else {
+      setError(null);
+    }
     setPreviewOpen(true);
   };
 

@@ -39,5 +39,11 @@ def save_snacks_drinks(
     if not payload.entries:
         raise HTTPException(status_code=400, detail="No entries to save")
     entries = [e.model_dump() for e in payload.entries]
-    saved = daily_db.save_snacks_drinks_daily(payload.date, entries, user.user_id)
+    try:
+        saved = daily_db.save_snacks_drinks_daily(payload.date, entries, user.user_id)
+    except ValueError:
+        raise HTTPException(
+            status_code=400,
+            detail="Closing cannot exceed Total for one or more items. Fix highlighted rows.",
+        )
     return {"saved": saved, "date": str(payload.date)}

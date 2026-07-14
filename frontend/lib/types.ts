@@ -34,6 +34,7 @@ export type SnacksEntry = {
   price_ksh?: number;
   revenue?: number | null;
   record_id?: number | null;
+  over_closing?: boolean;
 };
 
 export type StockEntry = {
@@ -79,6 +80,7 @@ export type BarEntry = {
   revenue?: number | null;
   record_id?: number | null;
   opening_from_date?: string | null;
+  over_closing?: boolean;
 };
 
 export type AuditRow = {
@@ -94,6 +96,23 @@ export type AuditRow = {
   quantity?: number;
   price_ksh?: number;
   revenue?: number;
+};
+
+export type AnalyticsRange = "today" | "7d" | "30d" | "90d";
+export type AnalyticsCategory = "snacks" | "drinks" | "food" | "kuku";
+
+export type AnalyticsGroupTotal = {
+  key: AnalyticsCategory;
+  label: string;
+  sold_units: number;
+  revenue: number;
+};
+
+export type AnalyticsItemSold = {
+  item_id: number;
+  name: string;
+  sold_units: number;
+  revenue: number;
 };
 
 export const HOTEL_ROLE_OPTIONS = [

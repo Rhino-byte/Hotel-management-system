@@ -44,13 +44,20 @@ def _compute_snacks_metrics(record: dict[str, Any]) -> dict[str, Any]:
     price_ksh = float(record.get("price_ksh") or 0)
     record["total_units"] = total_units
     if closing_raw is None:
+        record["over_closing"] = False
         record["sold_units"] = None
         record["revenue"] = None
     else:
         closing = float(closing_raw)
-        sold_units = max(total_units - closing, 0.0)
-        record["sold_units"] = sold_units
-        record["revenue"] = sold_units * price_ksh
+        over_closing = closing > total_units
+        record["over_closing"] = over_closing
+        if over_closing:
+            record["sold_units"] = None
+            record["revenue"] = None
+        else:
+            sold_units = total_units - closing
+            record["sold_units"] = sold_units
+            record["revenue"] = sold_units * price_ksh
     if record.get("previous_from_date") is not None:
         record["previous_from_date"] = str(record["previous_from_date"])
     return record
@@ -87,11 +94,41 @@ def get_snacks_drinks_daily(entry_date: date) -> list[dict[str, Any]]:
         return [_compute_snacks_metrics(dict(row)) for row in rows]
 
 
+def _validate_snacks_closing_not_over_total(
+    conn, entry_date: date, entries: list[dict[str, Any]]
+) -> None:
+    violations: list[str] = []
+    for entry in entries:
+        if entry.get("closing_stock") is None:
+            continue
+        item_id = int(entry["item_id"])
+        closing = float(entry["closing_stock"])
+        added = float(entry.get("added_stock") or 0)
+        prev_row = conn.execute(
+            """
+            SELECT closing_stock FROM snacks_drinks_daily
+            WHERE item_id = %s
+              AND entry_date = (%s::date - INTERVAL '1 day')::date
+            """,
+            (item_id, entry_date),
+        ).fetchone()
+        previous = float(prev_row["closing_stock"]) if prev_row else 0.0
+        total = previous + added
+        if closing > total:
+            name_row = conn.execute(
+                "SELECT name FROM items WHERE id = %s", (item_id,)
+            ).fetchone()
+            violations.append(name_row["name"] if name_row else str(item_id))
+    if violations:
+        raise ValueError(f"closing_exceeds_total:{','.join(violations)}")
+
+
 def save_snacks_drinks_daily(
     entry_date: date, entries: list[dict[str, Any]], user_id: int
 ) -> int:
     saved = 0
     with get_conn() as conn:
+        _validate_snacks_closing_not_over_total(conn, entry_date, entries)
         for entry in entries:
             item_id = int(entry["item_id"])
             closing = float(entry.get("closing_stock") or 0)
@@ -437,13 +474,20 @@ def _compute_bar_metrics(record: dict[str, Any]) -> dict[str, Any]:
     price_ksh = float(record.get("price_ksh") or 0)
     record["total_units"] = total_units
     if closing_raw is None:
+        record["over_closing"] = False
         record["sold_units"] = None
         record["revenue"] = None
     else:
         closing = float(closing_raw)
-        sold_units = max(total_units - closing, 0.0)
-        record["sold_units"] = sold_units
-        record["revenue"] = sold_units * price_ksh
+        over_closing = closing > total_units
+        record["over_closing"] = over_closing
+        if over_closing:
+            record["sold_units"] = None
+            record["revenue"] = None
+        else:
+            sold_units = total_units - closing
+            record["sold_units"] = sold_units
+            record["revenue"] = sold_units * price_ksh
     if record.get("opening_from_date") is not None:
         record["opening_from_date"] = str(record["opening_from_date"])
     return record
@@ -485,9 +529,40 @@ def get_bar_daily(entry_date: date) -> list[dict[str, Any]]:
         return [_compute_bar_metrics(dict(row)) for row in rows]
 
 
+def _validate_bar_closing_not_over_total(
+    conn, entry_date: date, entries: list[dict[str, Any]]
+) -> None:
+    violations: list[str] = []
+    for entry in entries:
+        if entry.get("closing_stock") is None:
+            continue
+        item_id = int(entry["item_id"])
+        closing = float(entry["closing_stock"])
+        added = float(entry.get("added_stock") or 0)
+        prev_row = conn.execute(
+            """
+            SELECT closing_stock FROM bar_daily
+            WHERE item_id = %s AND entry_date < %s
+            ORDER BY entry_date DESC
+            LIMIT 1
+            """,
+            (item_id, entry_date),
+        ).fetchone()
+        opening = float(prev_row["closing_stock"]) if prev_row else 0.0
+        total = opening + added
+        if closing > total:
+            name_row = conn.execute(
+                "SELECT name FROM items WHERE id = %s", (item_id,)
+            ).fetchone()
+            violations.append(name_row["name"] if name_row else str(item_id))
+    if violations:
+        raise ValueError(f"closing_exceeds_total:{','.join(violations)}")
+
+
 def save_bar_daily(entry_date: date, entries: list[dict[str, Any]], user_id: int) -> int:
     saved = 0
     with get_conn() as conn:
+        _validate_bar_closing_not_over_total(conn, entry_date, entries)
         for entry in entries:
             item_id = int(entry["item_id"])
             added = float(entry.get("added_stock") or 0)

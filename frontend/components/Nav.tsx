@@ -12,6 +12,7 @@ const MODULE_LINKS = [
 ];
 
 const ADMIN_LINKS = [
+  { href: "/admin/analytics", label: "Analytics" },
   { href: "/admin/prices", label: "Prices" },
   { href: "/admin/stock-items", label: "Stock Catalog" },
   { href: "/admin/employees", label: "Employees" },

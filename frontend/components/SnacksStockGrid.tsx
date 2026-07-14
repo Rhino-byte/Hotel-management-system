@@ -32,6 +32,7 @@ export default function SnacksStockGrid({ entries, onChange }: Props) {
     sold_units: row.sold_units,
     price_ksh: row.price_ksh,
     revenue: row.revenue,
+    over_closing: row.over_closing,
   }));
 
   return (
@@ -76,7 +77,7 @@ export default function SnacksStockGrid({ entries, onChange }: Props) {
                     inputMode="numeric"
                     min={0}
                     step={1}
-                    className="input-cell input-cell-touch"
+                    className={`input-cell input-cell-touch${row.over_closing ? " input-cell-error" : ""}`}
                     value={row.closing_stock ?? ""}
                     placeholder="—"
                     onChange={(e) =>

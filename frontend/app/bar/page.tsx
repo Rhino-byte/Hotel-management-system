@@ -7,7 +7,7 @@ import LoadingScreen from "../../components/LoadingScreen";
 import SaveButton from "../../components/SaveButton";
 import SavingOverlay from "../../components/SavingOverlay";
 import { fetchBar, saveBar, todayIso } from "../../lib/api";
-import { barTotals, recomputeBarEntry } from "../../lib/bar-utils";
+import { barTotals, overClosingDirtyEntries, recomputeBarEntry } from "../../lib/bar-utils";
 import { useRequireAuth } from "../../lib/auth";
 import type { BarEntry } from "../../lib/types";
 
@@ -63,7 +63,17 @@ export default function BarPage() {
       setError("No changes to save. Edit Add or B.B.F on items first.");
       return;
     }
-    setError(null);
+    const overRows = overClosingDirtyEntries(
+      entries.filter((e) => dirtyIds.has(e.item_id)),
+      dirtyIds
+    );
+    if (overRows.length > 0) {
+      setError(
+        `${overRows.length} item(s) have B.B.F greater than Total. Fix highlighted rows before saving.`
+      );
+    } else {
+      setError(null);
+    }
     setPreviewOpen(true);
   };
 

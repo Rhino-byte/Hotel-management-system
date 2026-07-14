@@ -13,15 +13,27 @@ export function recomputeBarEntry(entry: BarEntry): BarEntry {
     return {
       ...entry,
       total_units: total,
+      over_closing: false,
       sold_units: null,
       revenue: null,
     };
   }
   const closing = Number(entry.closing_stock);
-  const sold = Math.max(total - closing, 0);
+  const over = closing > total;
+  if (over) {
+    return {
+      ...entry,
+      total_units: total,
+      over_closing: true,
+      sold_units: null,
+      revenue: null,
+    };
+  }
+  const sold = total - closing;
   return {
     ...entry,
     total_units: total,
+    over_closing: false,
     sold_units: sold,
     revenue: sold * price,
   };
@@ -58,6 +70,13 @@ export function soldOutDirtyEntries(entries: BarEntry[], dirtyIds: Set<number>):
     const added = e.added_stock ?? 0;
     return opening + added > 0;
   });
+}
+
+export function overClosingDirtyEntries(
+  entries: BarEntry[],
+  dirtyIds: Set<number>
+): BarEntry[] {
+  return entries.filter((e) => dirtyIds.has(e.item_id) && e.over_closing === true);
 }
 
 export function formatBarCell(value: number | null | undefined, dash = true): string {

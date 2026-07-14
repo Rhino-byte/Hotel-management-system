@@ -12,6 +12,7 @@ export type StockEntryCardRow = {
   sold_units?: number | null;
   price_ksh?: number;
   revenue?: number | null;
+  over_closing?: boolean;
 };
 
 type Props = {
@@ -89,7 +90,7 @@ export default function StockEntryCards({ rows, formatCell, onChange }: Props) {
                 inputMode="numeric"
                 min={0}
                 step={1}
-                className="input-cell input-cell-touch"
+                className={`input-cell input-cell-touch${row.over_closing ? " input-cell-error" : ""}`}
                 value={row.closing_stock ?? ""}
                 placeholder="—"
                 onChange={(e) =>

@@ -5,6 +5,7 @@ import {
   countClosingSet,
   formatSnacksCell,
   isClosingSet,
+  overClosingDirtyEntries,
   soldOutDirtyEntries,
   unsetClosingWithStock,
 } from "../lib/snacks-utils";
@@ -50,15 +51,18 @@ function ReportTable({
             const added = row.added_stock ?? 0;
             const unsetWarn = warnUnset && !isClosingSet(row) && previous + added > 0;
             const highlight = highlightIds?.has(row.item_id);
+            const overClosing = row.over_closing === true;
             return (
               <tr
                 key={row.item_id}
                 className={
-                  highlight
-                    ? "bar-preview-row-dirty"
-                    : unsetWarn
-                      ? "bar-preview-row-warn"
-                      : undefined
+                  overClosing
+                    ? "bar-preview-row-warn"
+                    : highlight
+                      ? "bar-preview-row-dirty"
+                      : unsetWarn
+                        ? "bar-preview-row-warn"
+                        : undefined
                 }
               >
                 <td>{idx + 1}</td>
@@ -103,6 +107,7 @@ export default function SnacksSavePreview({
   const [soldOutAck, setSoldOutAck] = useState(false);
 
   const soldOutRows = soldOutDirtyEntries(entries, dirtyIds);
+  const overClosingRows = overClosingDirtyEntries(entries, dirtyIds);
   const dirtyEntries = entries.filter((e) => dirtyIds.has(e.item_id));
   const dirtyMissingClosing = dirtyEntries.filter((e) => !isClosingSet(e));
   const closingSet = countClosingSet(entries);
@@ -111,6 +116,7 @@ export default function SnacksSavePreview({
   const canConfirm =
     dirtyIds.size > 0 &&
     dirtyMissingClosing.length === 0 &&
+    overClosingRows.length === 0 &&
     (!needsSoldOutAck || soldOutAck);
 
   return (
@@ -165,6 +171,14 @@ export default function SnacksSavePreview({
           <div className="alert error">
             {soldOutRows.length} item(s) marked sold out (Closing = 0 with stock remaining):{" "}
             {soldOutRows.map((r) => r.name).join(", ")}
+          </div>
+        )}
+
+        {overClosingRows.length > 0 && (
+          <div className="alert error">
+            {overClosingRows.length} item(s) have Closing greater than Total (impossible):{" "}
+            {overClosingRows.map((r) => r.name).join(", ")}. Reduce Closing or increase Add
+            before saving.
           </div>
         )}
 
