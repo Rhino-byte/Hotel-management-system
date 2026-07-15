@@ -48,32 +48,14 @@ def create_food_item(
             (name,),
         ).fetchone()
         item = dict(row)
-        existing = conn.execute(
+        # Always insert a new price row so historical as-of lookups stay intact.
+        conn.execute(
             """
-            SELECT id FROM item_prices
-            WHERE item_id = %s
-            ORDER BY effective_from DESC, id DESC
-            LIMIT 1
+            INSERT INTO item_prices (item_id, price_ksh, updated_by)
+            VALUES (%s, %s, %s)
             """,
-            (item["id"],),
-        ).fetchone()
-        if existing:
-            conn.execute(
-                """
-                UPDATE item_prices
-                SET price_ksh = %s, updated_by = %s, updated_at = NOW()
-                WHERE id = %s
-                """,
-                (price_ksh, user_id, existing["id"]),
-            )
-        else:
-            conn.execute(
-                """
-                INSERT INTO item_prices (item_id, price_ksh, updated_by)
-                VALUES (%s, %s, %s)
-                """,
-                (item["id"], price_ksh, user_id),
-            )
+            (item["id"], price_ksh, user_id),
+        )
         conn.commit()
         item["price_ksh"] = float(price_ksh)
         return item
@@ -99,32 +81,14 @@ def create_snacks_drinks_item(
             (name, subcategory),
         ).fetchone()
         item = dict(row)
-        existing = conn.execute(
+        # Always insert a new price row so historical as-of lookups stay intact.
+        conn.execute(
             """
-            SELECT id FROM item_prices
-            WHERE item_id = %s
-            ORDER BY effective_from DESC, id DESC
-            LIMIT 1
+            INSERT INTO item_prices (item_id, price_ksh, updated_by)
+            VALUES (%s, %s, %s)
             """,
-            (item["id"],),
-        ).fetchone()
-        if existing:
-            conn.execute(
-                """
-                UPDATE item_prices
-                SET price_ksh = %s, updated_by = %s, updated_at = NOW()
-                WHERE id = %s
-                """,
-                (price_ksh, user_id, existing["id"]),
-            )
-        else:
-            conn.execute(
-                """
-                INSERT INTO item_prices (item_id, price_ksh, updated_by)
-                VALUES (%s, %s, %s)
-                """,
-                (item["id"], price_ksh, user_id),
-            )
+            (item["id"], price_ksh, user_id),
+        )
         conn.commit()
         item["price_ksh"] = float(price_ksh)
         return item

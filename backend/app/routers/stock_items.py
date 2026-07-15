@@ -1,7 +1,7 @@
 from datetime import date
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 
 from app.deps import CurrentUser, require_module
 from app.schemas.daily import DailyStockPayload
@@ -26,5 +26,8 @@ def save_stock_items(
     user: Annotated[CurrentUser, Depends(require_module(MODULE_STOCK_ITEMS))],
 ):
     entries = [e.model_dump() for e in payload.entries]
-    saved = daily_db.save_stock_items_daily(payload.date, entries, user.user_id)
+    try:
+        saved = daily_db.save_stock_items_daily(payload.date, entries, user.user_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
     return {"saved": saved, "date": str(payload.date)}

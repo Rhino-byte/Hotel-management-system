@@ -55,20 +55,17 @@ def save_food_kuku(
 ):
     if not payload.entries:
         raise HTTPException(status_code=400, detail="No entries to save")
-    if (
-        user.role == ROLE_FOOD_CLERK
-        and daily_db.is_food_kuku_day_locked(payload.date)
-    ):
-        raise HTTPException(
-            status_code=403,
-            detail="This day is finalized and cannot be edited.",
-        )
     entries = [e.model_dump() for e in payload.entries]
-    result = daily_db.save_food_kuku_daily(
-        payload.date,
-        entries,
-        user.user_id,
-        finalize=payload.finalize,
-    )
-    locked = daily_db.is_food_kuku_day_locked(payload.date)
-    return {"date": str(payload.date), **result, "locked": locked}
+    try:
+        result = daily_db.save_food_kuku_daily(
+            payload.date,
+            entries,
+            user.user_id,
+            finalize=payload.finalize,
+            block_if_locked=user.role == ROLE_FOOD_CLERK,
+        )
+    except daily_db.DayLockedError as exc:
+        raise HTTPException(status_code=403, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return {"date": str(payload.date), **result}

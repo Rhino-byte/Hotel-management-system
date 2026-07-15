@@ -47,6 +47,7 @@ def sales_totals(date_from: date, date_to: date) -> dict[str, Any]:
                      * COALESCE(
                        (SELECT ip.price_ksh FROM item_prices ip
                         WHERE ip.item_id = i.id
+                          AND ip.effective_from <= cur.entry_date
                         ORDER BY ip.effective_from DESC, ip.id DESC
                         LIMIT 1),
                        0
@@ -85,6 +86,7 @@ def sales_totals(date_from: date, date_to: date) -> dict[str, Any]:
                 * COALESCE(
                   (SELECT ip.price_ksh FROM item_prices ip
                    WHERE ip.item_id = i.id
+                     AND ip.effective_from <= f.entry_date
                    ORDER BY ip.effective_from DESC, ip.id DESC
                    LIMIT 1),
                   0
@@ -137,6 +139,7 @@ def items_sold(category: str, entry_date: date) -> dict[str, Any]:
                        * COALESCE(
                          (SELECT ip.price_ksh FROM item_prices ip
                           WHERE ip.item_id = i.id
+                            AND ip.effective_from <= cur.entry_date
                           ORDER BY ip.effective_from DESC, ip.id DESC
                           LIMIT 1),
                          0
@@ -174,6 +177,7 @@ def items_sold(category: str, entry_date: date) -> dict[str, Any]:
                        * COALESCE(
                          (SELECT ip.price_ksh FROM item_prices ip
                           WHERE ip.item_id = i.id
+                            AND ip.effective_from <= f.entry_date
                           ORDER BY ip.effective_from DESC, ip.id DESC
                           LIMIT 1),
                          0

@@ -1,17 +1,20 @@
 import logging
 from contextlib import asynccontextmanager
 
+from db.connection import close_pool, init_pool, load_env_file
+
+# Load .env before importing routers/security so JWT_SECRET and friends are set.
+load_env_file()
+
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from app.config import cors_origins, is_production, validate_settings
 from app.routers import admin, analytics, auth, bar, food_kuku, health, inventory, snacks_drinks, stock_items
-from db.connection import close_pool, init_pool, load_env_file
 
 logger = logging.getLogger("hotel_api")
 
-load_env_file()
 validate_settings()
 
 

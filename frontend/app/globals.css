@@ -80,7 +80,6 @@ textarea:focus {
   position: sticky;
   top: 0;
   z-index: 20;
-  backdrop-filter: blur(10px);
   background: linear-gradient(
     90deg,
     rgba(15, 23, 42, 0.95) 0%,
@@ -98,6 +97,7 @@ textarea:focus {
   align-items: center;
   gap: 1rem;
   flex-wrap: wrap;
+  backdrop-filter: blur(10px);
 }
 
 .nav-brand {
@@ -146,6 +146,50 @@ textarea:focus {
   padding: 0.18rem 0.5rem;
   font-size: 0.72rem;
   text-transform: uppercase;
+}
+
+.nav-toggle {
+  display: none;
+  position: relative;
+  z-index: 50;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  gap: 5px;
+  width: 2.5rem;
+  height: 2.5rem;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface-muted);
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.nav-toggle-bar {
+  display: block;
+  width: 1.15rem;
+  height: 2px;
+  border-radius: 1px;
+  background: var(--text);
+  transition: transform 0.2s ease, opacity 0.2s ease;
+}
+
+.nav-toggle.open .nav-toggle-bar:nth-child(1) {
+  transform: translateY(7px) rotate(45deg);
+}
+
+.nav-toggle.open .nav-toggle-bar:nth-child(2) {
+  opacity: 0;
+}
+
+.nav-toggle.open .nav-toggle-bar:nth-child(3) {
+  transform: translateY(-7px) rotate(-45deg);
+}
+
+.nav-overlay,
+.nav-drawer {
+  display: none;
 }
 
 .page {
@@ -854,9 +898,84 @@ h2 {
     width: calc(100% - 1rem);
   }
 
+  .nav-inner {
+    flex-wrap: nowrap;
+  }
+
+  .nav-links,
   .nav-user {
+    display: none;
+  }
+
+  .nav-toggle {
+    display: flex;
+  }
+
+  .nav-overlay {
+    display: block;
+    position: fixed;
+    inset: 0;
+    z-index: 30;
+    background: rgba(2, 6, 23, 0.55);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.2s ease;
+  }
+
+  .nav-overlay.open {
+    opacity: 1;
+    pointer-events: auto;
+  }
+
+  .nav-drawer {
+    display: flex;
+    flex-direction: column;
+    position: fixed;
+    top: 0;
+    right: 0;
+    z-index: 40;
+    width: min(20rem, 86vw);
+    height: 100%;
+    padding: 4rem 1rem 1.5rem;
+    background: #0b1224;
+    border-left: 1px solid var(--border);
+    box-shadow: -8px 0 32px rgba(0, 0, 0, 0.35);
+    transform: translateX(100%);
+    visibility: hidden;
+    pointer-events: none;
+    transition: transform 0.22s ease, visibility 0.22s ease;
+    overflow-y: auto;
+  }
+
+  .nav-drawer.open {
+    transform: translateX(0);
+    visibility: visible;
+    pointer-events: auto;
+  }
+
+  .nav-drawer-links {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+    margin-top: 0.5rem;
+  }
+
+  .nav-drawer .nav-link {
+    display: block;
     width: 100%;
-    justify-content: flex-end;
+    padding: 0.75rem 0.9rem;
+    border-radius: var(--radius-sm);
+    font-size: 0.95rem;
+  }
+
+  .nav-drawer-user {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.5rem;
+    margin-top: auto;
+    padding-top: 1.25rem;
+    border-top: 1px solid var(--border);
   }
 
   .card {

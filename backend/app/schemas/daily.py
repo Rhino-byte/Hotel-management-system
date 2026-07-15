@@ -1,5 +1,5 @@
 from datetime import date
-from typing import List
+from typing import List, Optional
 
 from pydantic import BaseModel
 
@@ -7,6 +7,12 @@ from pydantic import BaseModel
 class StockEntry(BaseModel):
     item_id: int
     closing_stock: float = 0
+    added_stock: float = 0
+
+
+class SnacksStockEntry(BaseModel):
+    item_id: int
+    closing_stock: Optional[float] = None
     added_stock: float = 0
 
 
@@ -18,6 +24,11 @@ class QuantityEntry(BaseModel):
 class DailyStockPayload(BaseModel):
     date: date
     entries: List[StockEntry]
+
+
+class DailySnacksPayload(BaseModel):
+    date: date
+    entries: List[SnacksStockEntry]
 
 
 class DailyQuantityPayload(BaseModel):

@@ -4,7 +4,7 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, HTTPException, Query
 
 from app.deps import CurrentUser, require_module
-from app.schemas.daily import DailyStockPayload
+from app.schemas.daily import DailySnacksPayload
 from core.roles import MODULE_SNACKS_DRINKS
 from db import daily as daily_db
 
@@ -33,7 +33,7 @@ def get_snacks_drinks(
 
 @router.post("/snacks-drinks")
 def save_snacks_drinks(
-    payload: DailyStockPayload,
+    payload: DailySnacksPayload,
     user: Annotated[CurrentUser, Depends(require_module(MODULE_SNACKS_DRINKS))],
 ):
     if not payload.entries:
@@ -41,9 +41,12 @@ def save_snacks_drinks(
     entries = [e.model_dump() for e in payload.entries]
     try:
         saved = daily_db.save_snacks_drinks_daily(payload.date, entries, user.user_id)
-    except ValueError:
-        raise HTTPException(
-            status_code=400,
-            detail="Closing cannot exceed Total for one or more items. Fix highlighted rows.",
-        )
+    except ValueError as exc:
+        msg = str(exc)
+        if msg.startswith("closing_exceeds_total:"):
+            raise HTTPException(
+                status_code=400,
+                detail="Closing cannot exceed Total for one or more items. Fix highlighted rows.",
+            ) from exc
+        raise HTTPException(status_code=400, detail=msg) from exc
     return {"saved": saved, "date": str(payload.date)}

@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
+import { FormEvent, useCallback, useEffect, useRef, useState } from "react";
 import FoodSavePreview from "../../components/FoodSavePreview";
 import LoadingScreen from "../../components/LoadingScreen";
 import SaveButton from "../../components/SaveButton";
@@ -23,39 +23,55 @@ export default function FoodKukuPage() {
   const [entries, setEntries] = useState<QuantityEntry[]>([]);
   const [baseline, setBaseline] = useState<Map<number, number>>(new Map());
   const [dirtyIds, setDirtyIds] = useState<Set<number>>(new Set());
+  const [entriesLoading, setEntriesLoading] = useState(false);
+  const [loadedDate, setLoadedDate] = useState<string | null>(null);
   const [locked, setLocked] = useState(false);
   const [previewOpen, setPreviewOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [addingDish, setAddingDish] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
+  const fetchGenRef = useRef(0);
 
   const isClerkLocked = locked && user?.role === "food_clerk";
+  const canEdit = !entriesLoading && loadedDate === date;
 
   const loadEntries = useCallback(() => {
-    setError(null);
+    const gen = ++fetchGenRef.current;
+    setEntries([]);
+    setLoadedDate(null);
+    setBaseline(new Map());
     setDirtyIds(new Set());
+    setError(null);
+    setEntriesLoading(true);
     return fetchFoodKuku(date)
       .then((d) => {
+        if (gen !== fetchGenRef.current) return;
         setEntries(d.entries);
         setBaseline(baselineFromEntries(d.entries));
         setLocked(d.locked);
+        setLoadedDate(date);
         setPreviewOpen(d.locked && user?.role === "food_clerk");
       })
-      .catch((e) => setError(e.message));
+      .catch((e) => {
+        if (gen !== fetchGenRef.current) return;
+        setError(e.message);
+        setEntries([]);
+        setLoadedDate(null);
+      })
+      .finally(() => {
+        if (gen === fetchGenRef.current) setEntriesLoading(false);
+      });
   }, [date, user?.role]);
 
   useEffect(() => {
     if (loading || !user) return;
+    setMessage(null);
     loadEntries();
   }, [loading, user, loadEntries]);
 
-  const totalRevenue = useMemo(
-    () => entries.reduce((sum, e) => sum + e.quantity * e.price_ksh, 0),
-    [entries]
-  );
-
   const onChange = (itemId: number, quantity: number) => {
+    if (!canEdit || isClerkLocked) return;
     setEntries((prev) =>
       prev.map((e) => (e.item_id === itemId ? { ...e, quantity } : e))
     );
@@ -72,6 +88,7 @@ export default function FoodKukuPage() {
   };
 
   const onReviewSave = () => {
+    if (!canEdit) return;
     if (dirtyIds.size === 0) {
       setError("No changes to save. Edit quantities on dishes first.");
       return;
@@ -81,6 +98,7 @@ export default function FoodKukuPage() {
   };
 
   const onConfirmSave = async () => {
+    if (!canEdit || loadedDate !== date) return;
     const dirtyEntries = entries.filter((e) => dirtyIds.has(e.item_id));
     const toPersist = dirtyEntries.filter(
       (e) => e.quantity > 0 || (baseline.get(e.item_id) ?? 0) > 0
@@ -100,6 +118,7 @@ export default function FoodKukuPage() {
       setEntries(refreshed.entries);
       setBaseline(baselineFromEntries(refreshed.entries));
       setLocked(refreshed.locked);
+      setLoadedDate(date);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Save failed");
     } finally {
@@ -171,7 +190,7 @@ export default function FoodKukuPage() {
             placeholder="New dish name"
             value={dishName}
             onChange={(e) => setDishName(e.target.value)}
-            disabled={isClerkLocked}
+            disabled={isClerkLocked || !canEdit}
             required
           />
           <input
@@ -181,10 +200,14 @@ export default function FoodKukuPage() {
             placeholder="Price (KSh)"
             value={dishPrice}
             onChange={(e) => setDishPrice(e.target.value)}
-            disabled={isClerkLocked}
+            disabled={isClerkLocked || !canEdit}
             required
           />
-          <button type="submit" className="btn btn-primary" disabled={addingDish || isClerkLocked}>
+          <button
+            type="submit"
+            className="btn btn-primary"
+            disabled={addingDish || isClerkLocked || !canEdit}
+          >
             Add Dish
           </button>
         </form>
@@ -206,15 +229,20 @@ export default function FoodKukuPage() {
             Reset
           </button>
         </div>
-        <QuantityGrid
-          entries={filteredEntries}
-          onChange={onChange}
-          totalRevenue={filteredRevenue || totalRevenue}
-          readOnly={isClerkLocked}
-        />
+        {entriesLoading ? (
+          <p className="empty-state">Loading entries…</p>
+        ) : (
+          <QuantityGrid
+            entries={filteredEntries}
+            onChange={onChange}
+            totalRevenue={filteredRevenue}
+            readOnly={isClerkLocked || !canEdit}
+          />
+        )}
         {!isClerkLocked && (
           <SaveButton
             saving={saving}
+            disabled={!canEdit}
             onClick={onReviewSave}
             label="Review & save"
             className="btn btn-primary"

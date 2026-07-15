@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import SnacksSavePreview from "../../components/SnacksSavePreview";
 import SnacksStockGrid from "../../components/SnacksStockGrid";
 import LoadingScreen from "../../components/LoadingScreen";
@@ -20,28 +20,50 @@ export default function SnacksDrinksPage() {
   const [activeTab, setActiveTab] = useState<SnacksTab>("all");
   const [entries, setEntries] = useState<SnacksEntry[]>([]);
   const [dirtyIds, setDirtyIds] = useState<Set<number>>(new Set());
+  const [entriesLoading, setEntriesLoading] = useState(false);
+  const [loadedDate, setLoadedDate] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [previewOpen, setPreviewOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
+  const fetchGenRef = useRef(0);
 
   useEffect(() => {
     if (loading || !user) return;
-    setError(null);
+    const gen = ++fetchGenRef.current;
+    setEntries([]);
+    setLoadedDate(null);
     setDirtyIds(new Set());
+    setError(null);
+    setMessage(null);
+    setPreviewOpen(false);
+    setEntriesLoading(true);
     fetchSnacksDrinks(date)
       .then((d) => {
+        if (gen !== fetchGenRef.current) return;
         const normalized = d.entries.map((e) => recomputeSnacksEntry(e));
         setEntries(normalized);
+        setLoadedDate(date);
       })
-      .catch((e) => setError(e.message));
+      .catch((e) => {
+        if (gen !== fetchGenRef.current) return;
+        setError(e.message);
+        setEntries([]);
+        setLoadedDate(null);
+      })
+      .finally(() => {
+        if (gen === fetchGenRef.current) setEntriesLoading(false);
+      });
   }, [date, loading, user]);
+
+  const canEdit = !entriesLoading && loadedDate === date;
 
   const onChange = (
     itemId: number,
     field: "added_stock" | "closing_stock",
     value: number | null
   ) => {
+    if (!canEdit) return;
     setEntries((prev) => {
       const next = prev.map((e) =>
         e.item_id === itemId ? recomputeSnacksEntry({ ...e, [field]: value }) : e
@@ -52,6 +74,7 @@ export default function SnacksDrinksPage() {
   };
 
   const onReviewSave = () => {
+    if (!canEdit) return;
     if (dirtyIds.size === 0) {
       setError("No changes to save. Edit Add or Closing on items first.");
       return;
@@ -71,6 +94,7 @@ export default function SnacksDrinksPage() {
   };
 
   const onConfirmSave = async () => {
+    if (!canEdit || loadedDate !== date) return;
     const dirtyEntries = entries.filter((e) => dirtyIds.has(e.item_id));
     setSaving(true);
     setError(null);
@@ -83,6 +107,7 @@ export default function SnacksDrinksPage() {
       const refreshed = await fetchSnacksDrinks(date);
       const normalized = refreshed.entries.map((e) => recomputeSnacksEntry(e));
       setEntries(normalized);
+      setLoadedDate(date);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Save failed");
     } finally {
@@ -187,9 +212,14 @@ export default function SnacksDrinksPage() {
             Reset
           </button>
         </div>
-        <SnacksStockGrid entries={filteredEntries} onChange={onChange} />
+        {entriesLoading ? (
+          <p className="empty-state">Loading entries…</p>
+        ) : (
+          <SnacksStockGrid entries={filteredEntries} onChange={onChange} />
+        )}
         <SaveButton
           saving={saving}
+          disabled={!canEdit}
           onClick={onReviewSave}
           label={dirtyIds.size > 0 ? `Review & save (${dirtyIds.size})` : "Review & save"}
           className="btn btn-primary"

@@ -4,6 +4,28 @@ from typing import Any, Optional
 from db.connection import get_conn
 
 
+def _assert_items_in_group(
+    conn, item_ids: list[int], group_type: str
+) -> None:
+    """Reject saves that reference items outside the module's group_type."""
+    if not item_ids:
+        return
+    unique_ids = list({int(i) for i in item_ids})
+    rows = conn.execute(
+        """
+        SELECT id FROM items
+        WHERE id = ANY(%s) AND group_type = %s AND is_active = TRUE
+        """,
+        (unique_ids, group_type),
+    ).fetchall()
+    valid = {int(r["id"]) for r in rows}
+    invalid = [i for i in unique_ids if i not in valid]
+    if invalid:
+        raise ValueError(
+            f"invalid_items_for_group:{group_type}:{','.join(str(i) for i in invalid)}"
+        )
+
+
 def log_audit(
     conn,
     *,
@@ -75,6 +97,7 @@ def get_snacks_drinks_daily(entry_date: date) -> list[dict[str, Any]]:
                    COALESCE(
                      (SELECT ip.price_ksh FROM item_prices ip
                       WHERE ip.item_id = i.id
+                        AND ip.effective_from <= %s
                       ORDER BY ip.effective_from DESC, ip.id DESC
                       LIMIT 1),
                      0
@@ -89,7 +112,7 @@ def get_snacks_drinks_daily(entry_date: date) -> list[dict[str, Any]]:
             WHERE i.group_type = 'snacks_drinks' AND i.is_active = TRUE
             ORDER BY i.subcategory NULLS LAST, i.display_order, i.name
             """,
-            (entry_date, entry_date),
+            (entry_date, entry_date, entry_date),
         ).fetchall()
         return [_compute_snacks_metrics(dict(row)) for row in rows]
 
@@ -128,10 +151,19 @@ def save_snacks_drinks_daily(
 ) -> int:
     saved = 0
     with get_conn() as conn:
+        # Only persist rows with an explicit closing; never treat unset as 0.
+        entries = [
+            e for e in entries if e.get("closing_stock") is not None
+        ]
+        if not entries:
+            return 0
+        _assert_items_in_group(
+            conn, [int(e["item_id"]) for e in entries], "snacks_drinks"
+        )
         _validate_snacks_closing_not_over_total(conn, entry_date, entries)
         for entry in entries:
             item_id = int(entry["item_id"])
-            closing = float(entry.get("closing_stock") or 0)
+            closing = float(entry["closing_stock"])
             added = float(entry.get("added_stock") or 0)
             existing = conn.execute(
                 """
@@ -204,6 +236,14 @@ def save_snacks_drinks_daily(
     return saved
 
 
+class DayLockedError(Exception):
+    """Raised when a food clerk tries to edit a finalized food & kuku day."""
+
+
+# Advisory-lock namespace for food_kuku day mutations (arbitrary stable int).
+_FOOD_KUKU_LOCK_NS = 8742001
+
+
 def is_food_kuku_day_locked(entry_date: date) -> bool:
     with get_conn() as conn:
         row = conn.execute(
@@ -235,6 +275,7 @@ def get_food_kuku_daily(entry_date: date) -> list[dict[str, Any]]:
                    COALESCE(
                      (SELECT ip.price_ksh FROM item_prices ip
                       WHERE ip.item_id = i.id
+                        AND ip.effective_from <= %s
                       ORDER BY ip.effective_from DESC, ip.id DESC
                       LIMIT 1),
                      0
@@ -246,7 +287,7 @@ def get_food_kuku_daily(entry_date: date) -> list[dict[str, Any]]:
             WHERE i.group_type = 'food_kuku' AND i.is_active = TRUE
             ORDER BY i.name
             """,
-            (entry_date,),
+            (entry_date, entry_date),
         ).fetchall()
         return [dict(r) for r in rows]
 
@@ -257,10 +298,29 @@ def save_food_kuku_daily(
     user_id: int,
     *,
     finalize: bool = False,
+    block_if_locked: bool = False,
 ) -> dict[str, Any]:
     saved = 0
     total_revenue = 0.0
     with get_conn() as conn:
+        # Serialize all mutations for this day so lock check + write + finalize
+        # cannot race across concurrent requests.
+        day_key = int(entry_date.strftime("%Y%m%d"))
+        conn.execute(
+            "SELECT pg_advisory_xact_lock(%s, %s)",
+            (_FOOD_KUKU_LOCK_NS, day_key),
+        )
+        locked_row = conn.execute(
+            "SELECT 1 FROM food_kuku_day_lock WHERE entry_date = %s",
+            (entry_date,),
+        ).fetchone()
+        if block_if_locked and locked_row is not None:
+            raise DayLockedError("This day is finalized and cannot be edited.")
+
+        _assert_items_in_group(
+            conn, [int(e["item_id"]) for e in entries], "food_kuku"
+        )
+
         for entry in entries:
             item_id = int(entry["item_id"])
             quantity = float(entry.get("quantity") or 0)
@@ -299,12 +359,13 @@ def save_food_kuku_daily(
                 SELECT COALESCE(
                   (SELECT ip.price_ksh FROM item_prices ip
                    WHERE ip.item_id = %s
+                     AND ip.effective_from <= %s
                    ORDER BY ip.effective_from DESC, ip.id DESC
                    LIMIT 1),
                   0
                 ) AS price_ksh
                 """,
-                (item_id,),
+                (item_id, entry_date),
             ).fetchone()
             price = float(price_row["price_ksh"])
             total_revenue += quantity * price
@@ -353,6 +414,7 @@ def save_food_kuku_daily(
                     changed_by=user_id,
                 )
             saved += 1
+        locked = locked_row is not None
         if finalize:
             conn.execute(
                 """
@@ -362,8 +424,9 @@ def save_food_kuku_daily(
                 """,
                 (entry_date, user_id),
             )
+            locked = True
         conn.commit()
-    return {"saved": saved, "total_revenue": total_revenue, "locked": finalize}
+    return {"saved": saved, "total_revenue": total_revenue, "locked": locked}
 
 
 def get_stock_items_daily(entry_date: date) -> list[dict[str, Any]]:
@@ -390,6 +453,9 @@ def save_stock_items_daily(
 ) -> int:
     saved = 0
     with get_conn() as conn:
+        _assert_items_in_group(
+            conn, [int(e["item_id"]) for e in entries], "stock"
+        )
         for entry in entries:
             item_id = int(entry["item_id"])
             closing = float(entry.get("closing_stock") or 0)
@@ -505,6 +571,7 @@ def get_bar_daily(entry_date: date) -> list[dict[str, Any]]:
                    COALESCE(
                      (SELECT ip.price_ksh FROM item_prices ip
                       WHERE ip.item_id = i.id
+                        AND ip.effective_from <= %s
                       ORDER BY ip.effective_from DESC, ip.id DESC
                       LIMIT 1),
                      0
@@ -524,7 +591,7 @@ def get_bar_daily(entry_date: date) -> list[dict[str, Any]]:
             WHERE i.group_type = 'bar' AND i.is_active = TRUE
             ORDER BY i.display_order, i.name
             """,
-            (entry_date, entry_date),
+            (entry_date, entry_date, entry_date),
         ).fetchall()
         return [_compute_bar_metrics(dict(row)) for row in rows]
 
@@ -562,6 +629,9 @@ def _validate_bar_closing_not_over_total(
 def save_bar_daily(entry_date: date, entries: list[dict[str, Any]], user_id: int) -> int:
     saved = 0
     with get_conn() as conn:
+        _assert_items_in_group(
+            conn, [int(e["item_id"]) for e in entries], "bar"
+        )
         _validate_bar_closing_not_over_total(conn, entry_date, entries)
         for entry in entries:
             item_id = int(entry["item_id"])
@@ -707,13 +777,15 @@ def get_inventory_audit(
               WHERE group_type = %s AND is_active = TRUE
             )
             SELECT il.id AS item_id, il.name AS item_name, d.entry_date,
-                   COALESCE(cur.closing_stock, 0) AS closing_stock,
-                   COALESCE(cur.added_stock, 0) AS added_stock,
+                   cur.id AS daily_record_id,
+                   cur.closing_stock AS closing_stock,
+                   cur.added_stock AS added_stock,
                    COALESCE(prev.closing_stock, 0) AS opening_stock,
-                   COALESCE(nxt.closing_stock, 0) AS next_closing_units,
+                   nxt.closing_stock AS next_closing_units,
                    COALESCE(
                      (SELECT ip.price_ksh FROM item_prices ip
                       WHERE ip.item_id = il.id
+                        AND ip.effective_from <= d.entry_date
                       ORDER BY ip.effective_from DESC, ip.id DESC
                       LIMIT 1),
                      0
@@ -735,11 +807,32 @@ def get_inventory_audit(
         result = [dict(r) for r in rows]
         if group == "snacks_drinks":
             for row in result:
-                total_units = float(row["opening_stock"]) + float(row["added_stock"])
-                sold_units = max(total_units - float(row["closing_stock"]), 0.0)
-                row["total_units"] = total_units
-                row["sold_units"] = sold_units
-                row["revenue"] = sold_units * float(row["price_ksh"])
+                if row.get("daily_record_id") is None:
+                    row["closing_stock"] = None
+                    row["added_stock"] = None
+                    row["total_units"] = None
+                    row["sold_units"] = None
+                    row["revenue"] = None
+                else:
+                    added = float(row["added_stock"] or 0)
+                    closing = float(row["closing_stock"] or 0)
+                    total_units = float(row["opening_stock"]) + added
+                    sold_units = max(total_units - closing, 0.0)
+                    row["added_stock"] = added
+                    row["closing_stock"] = closing
+                    row["total_units"] = total_units
+                    row["sold_units"] = sold_units
+                    row["revenue"] = sold_units * float(row["price_ksh"])
+        else:
+            for row in result:
+                if row.get("daily_record_id") is None:
+                    row["closing_stock"] = None
+                    row["added_stock"] = None
+                else:
+                    row["added_stock"] = float(row["added_stock"] or 0)
+                    row["closing_stock"] = float(row["closing_stock"] or 0)
+        for row in result:
+            row.pop("daily_record_id", None)
         return result
 
 
@@ -755,21 +848,26 @@ def _food_kuku_audit(date_from: date, date_to: date) -> list[dict[str, Any]]:
               WHERE group_type = 'food_kuku' AND is_active = TRUE
             )
             SELECT il.id AS item_id, il.name AS item_name, d.entry_date,
-                   COALESCE(f.quantity, 0) AS quantity,
+                   CASE WHEN f.id IS NULL THEN NULL ELSE COALESCE(f.quantity, 0) END AS quantity,
                    COALESCE(
                      (SELECT ip.price_ksh FROM item_prices ip
                       WHERE ip.item_id = il.id
+                        AND ip.effective_from <= d.entry_date
                       ORDER BY ip.effective_from DESC, ip.id DESC
                       LIMIT 1),
                      0
                    ) AS price_ksh,
-                   COALESCE(f.quantity, 0) * COALESCE(
-                     (SELECT ip.price_ksh FROM item_prices ip
-                      WHERE ip.item_id = il.id
-                      ORDER BY ip.effective_from DESC, ip.id DESC
-                      LIMIT 1),
-                     0
-                   ) AS revenue
+                   CASE
+                     WHEN f.id IS NULL THEN NULL
+                     ELSE COALESCE(f.quantity, 0) * COALESCE(
+                       (SELECT ip.price_ksh FROM item_prices ip
+                        WHERE ip.item_id = il.id
+                          AND ip.effective_from <= d.entry_date
+                        ORDER BY ip.effective_from DESC, ip.id DESC
+                        LIMIT 1),
+                       0
+                     )
+                   END AS revenue
             FROM items_list il
             CROSS JOIN dates d
             LEFT JOIN food_kuku_daily f
@@ -800,6 +898,7 @@ def _bar_audit(date_from: date, date_to: date) -> list[dict[str, Any]]:
                    COALESCE(
                      (SELECT ip.price_ksh FROM item_prices ip
                       WHERE ip.item_id = il.id
+                        AND ip.effective_from <= d.entry_date
                       ORDER BY ip.effective_from DESC, ip.id DESC
                       LIMIT 1),
                      0

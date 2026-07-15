@@ -49,9 +49,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setToken(null);
       }
     } finally {
-      if (gen === authGenRef.current) {
-        setLoading(false);
-      }
+      // Always clear loading so a login/logout race cannot leave it stuck true.
+      setLoading(false);
     }
   }, []);
 
@@ -63,10 +62,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     async (firstName: string, pin: number) => {
       authGenRef.current += 1;
       setToken(null);
-      const res = await apiLogin(firstName, pin);
-      setToken(res.access_token);
-      setUser(res.user);
-      router.push(res.user.default_route || "/");
+      try {
+        const res = await apiLogin(firstName, pin);
+        setToken(res.access_token);
+        setUser(res.user);
+        setLoading(false);
+        router.push(res.user.default_route || "/");
+      } catch (err) {
+        setLoading(false);
+        throw err;
+      }
     },
     [router]
   );
@@ -75,6 +80,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     authGenRef.current += 1;
     setToken(null);
     setUser(null);
+    setLoading(false);
     router.push("/login");
   }, [router]);
 

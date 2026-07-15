@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import LoadingScreen from "../../components/LoadingScreen";
 import SaveButton from "../../components/SaveButton";
 import SavingOverlay from "../../components/SavingOverlay";
@@ -14,17 +14,39 @@ export default function StockItemsPage() {
   const [date, setDate] = useState(todayIso());
   const [query, setQuery] = useState("");
   const [entries, setEntries] = useState<StockEntry[]>([]);
+  const [entriesLoading, setEntriesLoading] = useState(false);
+  const [loadedDate, setLoadedDate] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
+  const fetchGenRef = useRef(0);
 
   useEffect(() => {
     if (loading || !user) return;
+    const gen = ++fetchGenRef.current;
+    setEntries([]);
+    setLoadedDate(null);
     setError(null);
+    setMessage(null);
+    setEntriesLoading(true);
     fetchStockItems(date)
-      .then((d) => setEntries(d.entries))
-      .catch((e) => setError(e.message));
+      .then((d) => {
+        if (gen !== fetchGenRef.current) return;
+        setEntries(d.entries);
+        setLoadedDate(date);
+      })
+      .catch((e) => {
+        if (gen !== fetchGenRef.current) return;
+        setError(e.message);
+        setEntries([]);
+        setLoadedDate(null);
+      })
+      .finally(() => {
+        if (gen === fetchGenRef.current) setEntriesLoading(false);
+      });
   }, [date, loading, user]);
+
+  const canSave = !entriesLoading && loadedDate === date && entries.length > 0;
 
   const onChange = (itemId: number, field: "closing_stock" | "added_stock", value: number) => {
     setEntries((prev) =>
@@ -33,6 +55,7 @@ export default function StockItemsPage() {
   };
 
   const onSave = async () => {
+    if (!canSave) return;
     setSaving(true);
     setError(null);
     setMessage(null);
@@ -84,9 +107,14 @@ export default function StockItemsPage() {
             Reset
           </button>
         </div>
-        <StockGrid entries={filteredEntries} onChange={onChange} />
+        {entriesLoading ? (
+          <p className="empty-state">Loading entries…</p>
+        ) : (
+          <StockGrid entries={filteredEntries} onChange={onChange} />
+        )}
         <SaveButton
           saving={saving}
+          disabled={!canSave}
           onClick={onSave}
           label="Save All"
           className="btn btn-primary"

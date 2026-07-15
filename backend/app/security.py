@@ -5,9 +5,16 @@ from typing import Any
 import bcrypt
 from jose import JWTError, jwt
 
-JWT_SECRET = os.getenv("JWT_SECRET", "change-me-in-production")
 JWT_ALGORITHM = "HS256"
-JWT_EXPIRE_HOURS = int(os.getenv("JWT_EXPIRE_HOURS", "24"))
+DEFAULT_JWT_SECRET = "change-me-in-production"
+
+
+def _jwt_secret() -> str:
+    return os.getenv("JWT_SECRET", DEFAULT_JWT_SECRET)
+
+
+def _jwt_expire_hours() -> int:
+    return int(os.getenv("JWT_EXPIRE_HOURS", "24"))
 
 
 def verify_password(plain: str, hashed: str) -> bool:
@@ -29,7 +36,7 @@ def create_access_token(
     display_name: str,
     payroll_role: str,
 ) -> str:
-    expire = datetime.now(timezone.utc) + timedelta(hours=JWT_EXPIRE_HOURS)
+    expire = datetime.now(timezone.utc) + timedelta(hours=_jwt_expire_hours())
     payload = {
         "sub": str(employee_id),
         "role": hotel_role,
@@ -37,11 +44,11 @@ def create_access_token(
         "display_name": display_name,
         "exp": expire,
     }
-    return jwt.encode(payload, JWT_SECRET, algorithm=JWT_ALGORITHM)
+    return jwt.encode(payload, _jwt_secret(), algorithm=JWT_ALGORITHM)
 
 
 def decode_token(token: str) -> dict[str, Any]:
-    return jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
+    return jwt.decode(token, _jwt_secret(), algorithms=[JWT_ALGORITHM])
 
 
 def safe_decode_token(token: str) -> dict[str, Any] | None:

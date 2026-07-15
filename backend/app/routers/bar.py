@@ -41,9 +41,12 @@ def save_bar(
     entries = [e.model_dump() for e in payload.entries]
     try:
         saved = daily_db.save_bar_daily(payload.date, entries, user.user_id)
-    except ValueError:
-        raise HTTPException(
-            status_code=400,
-            detail="Closing cannot exceed Total for one or more items. Fix highlighted rows.",
-        )
+    except ValueError as exc:
+        msg = str(exc)
+        if msg.startswith("closing_exceeds_total:"):
+            raise HTTPException(
+                status_code=400,
+                detail="Closing cannot exceed Total for one or more items. Fix highlighted rows.",
+            ) from exc
+        raise HTTPException(status_code=400, detail=msg) from exc
     return {"saved": saved, "date": str(payload.date)}

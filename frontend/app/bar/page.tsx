@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import BarSavePreview from "../../components/BarSavePreview";
 import BarStockGrid from "../../components/BarStockGrid";
 import LoadingScreen from "../../components/LoadingScreen";
@@ -17,12 +17,15 @@ export default function BarPage() {
   const [query, setQuery] = useState("");
   const [entries, setEntries] = useState<BarEntry[]>([]);
   const [dirtyIds, setDirtyIds] = useState<Set<number>>(new Set());
+  const [entriesLoading, setEntriesLoading] = useState(false);
+  const [loadedDate, setLoadedDate] = useState<string | null>(null);
   const [totalSoldUnits, setTotalSoldUnits] = useState(0);
   const [totalRevenue, setTotalRevenue] = useState(0);
   const [saving, setSaving] = useState(false);
   const [previewOpen, setPreviewOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
+  const fetchGenRef = useRef(0);
 
   const applyTotals = useCallback((list: BarEntry[]) => {
     const t = barTotals(list);
@@ -32,22 +35,43 @@ export default function BarPage() {
 
   useEffect(() => {
     if (loading || !user) return;
-    setError(null);
+    const gen = ++fetchGenRef.current;
+    setEntries([]);
+    setLoadedDate(null);
     setDirtyIds(new Set());
+    setTotalSoldUnits(0);
+    setTotalRevenue(0);
+    setError(null);
+    setMessage(null);
+    setPreviewOpen(false);
+    setEntriesLoading(true);
     fetchBar(date)
       .then((d) => {
+        if (gen !== fetchGenRef.current) return;
         const normalized = d.entries.map((e) => recomputeBarEntry(e));
         setEntries(normalized);
         applyTotals(normalized);
+        setLoadedDate(date);
       })
-      .catch((e) => setError(e.message));
+      .catch((e) => {
+        if (gen !== fetchGenRef.current) return;
+        setError(e.message);
+        setEntries([]);
+        setLoadedDate(null);
+      })
+      .finally(() => {
+        if (gen === fetchGenRef.current) setEntriesLoading(false);
+      });
   }, [date, loading, user, applyTotals]);
+
+  const canEdit = !entriesLoading && loadedDate === date;
 
   const onChange = (
     itemId: number,
     field: "added_stock" | "closing_stock",
     value: number | null
   ) => {
+    if (!canEdit) return;
     setEntries((prev) => {
       const next = prev.map((e) =>
         e.item_id === itemId ? recomputeBarEntry({ ...e, [field]: value }) : e
@@ -59,6 +83,7 @@ export default function BarPage() {
   };
 
   const onReviewSave = () => {
+    if (!canEdit) return;
     if (dirtyIds.size === 0) {
       setError("No changes to save. Edit Add or B.B.F on items first.");
       return;
@@ -78,6 +103,7 @@ export default function BarPage() {
   };
 
   const onConfirmSave = async () => {
+    if (!canEdit || loadedDate !== date) return;
     const dirtyEntries = entries.filter((e) => dirtyIds.has(e.item_id));
     setSaving(true);
     setError(null);
@@ -91,6 +117,7 @@ export default function BarPage() {
       const normalized = refreshed.entries.map((e) => recomputeBarEntry(e));
       setEntries(normalized);
       applyTotals(normalized);
+      setLoadedDate(date);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Save failed");
     } finally {
@@ -164,9 +191,14 @@ export default function BarPage() {
             Reset
           </button>
         </div>
-        <BarStockGrid entries={filteredEntries} onChange={onChange} />
+        {entriesLoading ? (
+          <p className="empty-state">Loading entries…</p>
+        ) : (
+          <BarStockGrid entries={filteredEntries} onChange={onChange} />
+        )}
         <SaveButton
           saving={saving}
+          disabled={!canEdit}
           onClick={onReviewSave}
           label={dirtyIds.size > 0 ? `Review & save (${dirtyIds.size})` : "Review & save"}
           className="btn btn-primary"

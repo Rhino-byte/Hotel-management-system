@@ -15,11 +15,13 @@ export async function saveSnacksDrinks(date: string, entries: SnacksEntry[]) {
     method: "POST",
     body: JSON.stringify({
       date,
-      entries: entries.map((e) => ({
-        item_id: e.item_id,
-        closing_stock: e.closing_stock ?? 0,
-        added_stock: e.added_stock ?? 0,
-      })),
+      entries: entries
+        .filter((e) => e.closing_stock !== null && e.closing_stock !== undefined)
+        .map((e) => ({
+          item_id: e.item_id,
+          closing_stock: Number(e.closing_stock),
+          added_stock: e.added_stock ?? 0,
+        })),
     }),
   });
 }
