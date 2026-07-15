@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useEffect, useId, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { useAuth } from "../lib/auth";
 
 const MODULE_LINKS = [
@@ -27,6 +27,7 @@ export default function Nav() {
   const pathname = usePathname();
   const [menuOpen, setMenuOpen] = useState(false);
   const drawerId = useId();
+  const drawerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     setMenuOpen(false);
@@ -44,6 +45,14 @@ export default function Nav() {
       document.removeEventListener("keydown", onKeyDown);
       document.body.style.overflow = prevOverflow;
     };
+  }, [menuOpen]);
+
+  // React 18 typings omit `inert`; set it on the DOM node instead.
+  useEffect(() => {
+    const el = drawerRef.current;
+    if (!el) return;
+    if (!menuOpen) el.setAttribute("inert", "");
+    else el.removeAttribute("inert");
   }, [menuOpen]);
 
   if (!user || pathname === "/login") return null;
@@ -127,13 +136,13 @@ export default function Nav() {
         onClick={closeMenu}
       />
       <div
+        ref={drawerRef}
         id={drawerId}
         className={`nav-drawer${menuOpen ? " open" : ""}`}
         role="dialog"
         aria-modal="true"
         aria-label="Navigation menu"
         aria-hidden={!menuOpen}
-        inert={!menuOpen ? true : undefined}
       >
         <nav className="nav-drawer-links" aria-label="Main">
           {renderLinks(closeMenu)}
