@@ -202,7 +202,7 @@ export default function AdminAnalyticsPage() {
               ))}
             </div>
           </div>
-          <p className="analytics-meta">Items sold more than once on the selected day.</p>
+          <p className="analytics-meta">Items sold on the selected day.</p>
           <div className="filters">
             <label className="field">
               <span>Date</span>
@@ -216,7 +216,7 @@ export default function AdminAnalyticsPage() {
           {itemsLoading ? (
             <p className="empty-state">Loading items…</p>
           ) : items.length === 0 ? (
-            <p className="empty-state">No items sold more than once on this day.</p>
+            <p className="empty-state">No items sold on this day.</p>
           ) : (
             <div className="analytics-chart" style={{ height: chartHeight }}>
               <ResponsiveContainer width="100%" height="100%">

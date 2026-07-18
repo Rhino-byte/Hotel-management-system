@@ -158,7 +158,7 @@ def items_sold(category: str, entry_date: date) -> dict[str, Any]:
                           + COALESCE(cur.added_stock, 0)
                           - cur.closing_stock,
                         0
-                      ) > 1
+                      ) > 0
                 ORDER BY sold_units DESC, i.name
                 """,
                 (entry_date, category),
@@ -186,7 +186,7 @@ def items_sold(category: str, entry_date: date) -> dict[str, Any]:
                 JOIN items i ON i.id = f.item_id
                 WHERE f.entry_date = %s
                   AND i.group_type = 'food_kuku'
-                  AND COALESCE(f.quantity, 0) > 1
+                  AND COALESCE(f.quantity, 0) > 0
                   {kuku_filter}
                 ORDER BY sold_units DESC, i.name
                 """,
