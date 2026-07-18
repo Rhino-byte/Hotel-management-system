@@ -31,8 +31,7 @@ export default function AdminAuditPage() {
   const { user, loading } = useRequireAuditAccess();
   const [group, setGroup] = useState("snacks_drinks");
   const [groupInitialized, setGroupInitialized] = useState(false);
-  const [dateFrom, setDateFrom] = useState(todayIso());
-  const [dateTo, setDateTo] = useState(todayIso());
+  const [date, setDate] = useState(todayIso());
   const [rows, setRows] = useState<AuditRow[]>([]);
   const [query, setQuery] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -46,13 +45,13 @@ export default function AdminAuditPage() {
 
   useEffect(() => {
     setSummaryOpen(false);
-  }, [group, dateFrom, dateTo]);
+  }, [group, date]);
 
   const onLoad = async () => {
     setError(null);
     setSummaryOpen(false);
     try {
-      const res = await fetchInventoryAudit(group, dateFrom, dateTo);
+      const res = await fetchInventoryAudit(group, date, date);
       setRows(res.rows);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to load audit");
@@ -104,12 +103,8 @@ export default function AdminAuditPage() {
             placeholder="Search module..."
           />
           <label className="field">
-            <span>From</span>
-            <input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} />
-          </label>
-          <label className="field">
-            <span>To</span>
-            <input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} />
+            <span>Date</span>
+            <input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
           </label>
           <label className="field">
             <span>Search item</span>
@@ -251,8 +246,7 @@ export default function AdminAuditPage() {
       {summaryOpen && canShowSummary && (
         <AuditSalesSummaryPreview
           kind={isSnacksGroup ? "snacks_drinks" : "food_kuku"}
-          dateFrom={dateFrom}
-          dateTo={dateTo}
+          date={date}
           rows={filteredRows}
           onClose={() => setSummaryOpen(false)}
         />

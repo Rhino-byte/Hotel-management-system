@@ -7,8 +7,7 @@ type SummaryKind = "snacks_drinks" | "food_kuku";
 
 type Props = {
   kind: SummaryKind;
-  dateFrom: string;
-  dateTo: string;
+  date: string;
   rows: AuditRow[];
   onClose: () => void;
 };
@@ -16,7 +15,6 @@ type Props = {
 type SummaryLine = {
   key: string;
   item_name: string;
-  entry_date: string;
   units: number;
   revenue: number;
 };
@@ -25,12 +23,10 @@ function GroupTable({
   label,
   lines,
   unitsLabel,
-  showDate,
 }: {
   label: string;
   lines: SummaryLine[];
   unitsLabel: string;
-  showDate: boolean;
 }) {
   if (lines.length === 0) return null;
   const revenue = lines.reduce((sum, r) => sum + r.revenue, 0);
@@ -42,7 +38,6 @@ function GroupTable({
         <table className="data-table">
           <thead>
             <tr>
-              {showDate && <th>Date</th>}
               <th>Item</th>
               <th>{unitsLabel}</th>
               <th>Revenue (KSh)</th>
@@ -51,7 +46,6 @@ function GroupTable({
           <tbody>
             {lines.map((row) => (
               <tr key={row.key} className="bar-preview-row-dirty">
-                {showDate && <td>{row.entry_date}</td>}
                 <td>{row.item_name}</td>
                 <td>{row.units.toLocaleString()}</td>
                 <td>{formatKsh(row.revenue)}</td>
@@ -76,7 +70,6 @@ function snacksLines(rows: AuditRow[]): { snacks: SummaryLine[]; drinks: Summary
     const line: SummaryLine = {
       key: `${row.item_id}-${row.entry_date}-snacks`,
       item_name: row.item_name,
-      entry_date: row.entry_date,
       units,
       revenue: Number(row.revenue ?? 0),
     };
@@ -95,7 +88,6 @@ function foodLines(rows: AuditRow[]): { kuku: SummaryLine[]; food: SummaryLine[]
     const line: SummaryLine = {
       key: `${row.item_id}-${row.entry_date}-food`,
       item_name: row.item_name,
-      entry_date: row.entry_date,
       units,
       revenue: Number(row.revenue ?? units * Number(row.price_ksh ?? 0)),
     };
@@ -107,14 +99,10 @@ function foodLines(rows: AuditRow[]): { kuku: SummaryLine[]; food: SummaryLine[]
 
 export default function AuditSalesSummaryPreview({
   kind,
-  dateFrom,
-  dateTo,
+  date,
   rows,
   onClose,
 }: Props) {
-  const showDate = dateFrom !== dateTo;
-  const dateLabel = showDate ? `${dateFrom} → ${dateTo}` : dateFrom;
-
   const groups =
     kind === "snacks_drinks"
       ? (() => {
@@ -150,7 +138,7 @@ export default function AuditSalesSummaryPreview({
               {title}
             </h2>
             <p className="modal-subtitle">
-              {dateLabel} · {allLines.length} sold line
+              {date} · {allLines.length} sold line
               {allLines.length === 1 ? "" : "s"}
             </p>
           </div>
@@ -169,7 +157,6 @@ export default function AuditSalesSummaryPreview({
                 label={g.label}
                 lines={g.lines}
                 unitsLabel={g.unitsLabel}
-                showDate={showDate}
               />
             ))}
             <p className="food-preview-grand-total">
