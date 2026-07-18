@@ -773,10 +773,11 @@ def get_inventory_audit(
               SELECT generate_series(%s::date, %s::date, '1 day'::interval)::date AS entry_date
             ),
             items_list AS (
-              SELECT id, name FROM items
+              SELECT id, name, subcategory FROM items
               WHERE group_type = %s AND is_active = TRUE
             )
             SELECT il.id AS item_id, il.name AS item_name, d.entry_date,
+                   il.subcategory,
                    cur.id AS daily_record_id,
                    cur.closing_stock AS closing_stock,
                    cur.added_stock AS added_stock,

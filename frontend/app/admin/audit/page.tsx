@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { fetchInventoryAudit, todayIso } from "../../../lib/api";
 import { useRequireAuditAccess } from "../../../lib/auth";
 import type { AuditRow } from "../../../lib/types";
+import AuditSalesSummaryPreview from "../../../components/AuditSalesSummaryPreview";
 import LoadingScreen from "../../../components/LoadingScreen";
 import SearchableSelect from "../../../components/SearchableSelect";
 
@@ -35,6 +36,7 @@ export default function AdminAuditPage() {
   const [rows, setRows] = useState<AuditRow[]>([]);
   const [query, setQuery] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [summaryOpen, setSummaryOpen] = useState(false);
 
   useEffect(() => {
     if (loading || !user || groupInitialized) return;
@@ -42,8 +44,13 @@ export default function AdminAuditPage() {
     setGroupInitialized(true);
   }, [loading, user, groupInitialized]);
 
+  useEffect(() => {
+    setSummaryOpen(false);
+  }, [group, dateFrom, dateTo]);
+
   const onLoad = async () => {
     setError(null);
+    setSummaryOpen(false);
     try {
       const res = await fetchInventoryAudit(group, dateFrom, dateTo);
       setRows(res.rows);
@@ -56,8 +63,10 @@ export default function AdminAuditPage() {
   if (!user) return null;
 
   const isSnacksGroup = group === "snacks_drinks";
+  const isFoodGroup = group === "food_kuku";
   const isStockGroup = group === "stock";
   const isBarGroup = group === "bar";
+  const canShowSummary = (isSnacksGroup || isFoodGroup) && rows.length > 0;
   const groupOptions = GROUPS.filter((g) =>
     user.role === "admin"
       ? true
@@ -117,6 +126,15 @@ export default function AdminAuditPage() {
           <button type="button" className="btn btn-primary" onClick={onLoad}>
             Load
           </button>
+          {canShowSummary && (
+            <button
+              type="button"
+              className="btn btn-secondary"
+              onClick={() => setSummaryOpen(true)}
+            >
+              View summary
+            </button>
+          )}
         </div>
         <div className="table-wrap">
           <table className="data-table">
@@ -171,9 +189,18 @@ export default function AdminAuditPage() {
                       <td>{r.added_stock ?? 0}</td>
                       <td>{stockTotal(r)}</td>
                       <td>{r.closing_stock ?? 0}</td>
-                      <td>{Number(r.price_ksh ?? 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                      <td>
+                        {Number(r.price_ksh ?? 0).toLocaleString(undefined, {
+                          minimumFractionDigits: 2,
+                          maximumFractionDigits: 2,
+                        })}
+                      </td>
                       <td>{r.sold_units ?? 0}</td>
-                      <td>{(r.revenue ?? 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
+                      <td>
+                        {(r.revenue ?? 0).toLocaleString(undefined, {
+                          minimumFractionDigits: 2,
+                        })}
+                      </td>
                     </>
                   ) : isBarGroup ? (
                     <>
@@ -182,8 +209,17 @@ export default function AdminAuditPage() {
                       <td>{Number(r.total_units ?? stockTotal(r))}</td>
                       <td>{r.closing_stock ?? 0}</td>
                       <td>{r.sold_units ?? 0}</td>
-                      <td>{Number(r.price_ksh ?? 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
-                      <td>{(r.revenue ?? 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
+                      <td>
+                        {Number(r.price_ksh ?? 0).toLocaleString(undefined, {
+                          minimumFractionDigits: 2,
+                          maximumFractionDigits: 2,
+                        })}
+                      </td>
+                      <td>
+                        {(r.revenue ?? 0).toLocaleString(undefined, {
+                          minimumFractionDigits: 2,
+                        })}
+                      </td>
                     </>
                   ) : isStockGroup ? (
                     <>
@@ -196,16 +232,31 @@ export default function AdminAuditPage() {
                     <>
                       <td>{r.quantity ?? 0}</td>
                       <td>{r.price_ksh ?? 0}</td>
-                      <td>{(r.revenue ?? 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
+                      <td>
+                        {(r.revenue ?? 0).toLocaleString(undefined, {
+                          minimumFractionDigits: 2,
+                        })}
+                      </td>
                     </>
                   )}
                 </tr>
               ))}
             </tbody>
           </table>
-          {filteredRows.length === 0 && <p className="empty-state">No rows match current filters.</p>}
+          {filteredRows.length === 0 && (
+            <p className="empty-state">No rows match current filters.</p>
+          )}
         </div>
       </div>
+      {summaryOpen && canShowSummary && (
+        <AuditSalesSummaryPreview
+          kind={isSnacksGroup ? "snacks_drinks" : "food_kuku"}
+          dateFrom={dateFrom}
+          dateTo={dateTo}
+          rows={filteredRows}
+          onClose={() => setSummaryOpen(false)}
+        />
+      )}
     </main>
   );
 }

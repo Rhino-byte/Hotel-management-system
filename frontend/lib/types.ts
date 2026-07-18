@@ -87,6 +87,7 @@ export type AuditRow = {
   item_id: number;
   item_name: string;
   entry_date: string;
+  subcategory?: "snacks" | "drinks" | null;
   opening_stock?: number;
   closing_stock?: number;
   added_stock?: number;
