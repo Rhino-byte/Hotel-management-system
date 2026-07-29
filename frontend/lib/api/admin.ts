@@ -1,4 +1,4 @@
-import type { AuditRow, ItemSubcategory, PriceItem } from "../types";
+import type { AuditRow, ItemSubcategory, PriceItem, SalesAuditReport } from "../types";
 import { apiFetch } from "./client";
 
 export async function fetchPrices() {
@@ -53,6 +53,14 @@ export async function fetchInventoryAudit(
   return apiFetch<{ rows: AuditRow[] }>(
     `/api/inventory/audit?group=${group}&date_from=${dateFrom}&date_to=${dateTo}`
   );
+}
+
+export async function fetchSalesAudit(dateFrom: string, dateTo: string) {
+  const params = new URLSearchParams({
+    date_from: dateFrom,
+    date_to: dateTo,
+  });
+  return apiFetch<SalesAuditReport>(`/api/audit/sales-report?${params.toString()}`);
 }
 
 export async function fetchEmployees() {

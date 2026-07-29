@@ -11,7 +11,18 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from app.config import cors_origins, is_production, validate_settings
-from app.routers import admin, analytics, auth, bar, food_kuku, health, inventory, snacks_drinks, stock_items
+from app.routers import (
+    admin,
+    analytics,
+    audit_sales,
+    auth,
+    bar,
+    food_kuku,
+    health,
+    inventory,
+    snacks_drinks,
+    stock_items,
+)
 
 logger = logging.getLogger("hotel_api")
 
@@ -75,3 +86,4 @@ app.include_router(bar.router, prefix="/api")
 app.include_router(inventory.router, prefix="/api")
 app.include_router(admin.router, prefix="/api")
 app.include_router(analytics.router, prefix="/api")
+app.include_router(audit_sales.router, prefix="/api")

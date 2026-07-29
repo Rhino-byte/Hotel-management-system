@@ -827,6 +827,135 @@ h2 {
   background: #132038;
 }
 
+.audit-preset-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+}
+
+.sales-audit-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 0.75rem;
+}
+
+.sales-audit-tile {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.3rem;
+  min-height: 112px;
+  padding: 1rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: #0f1b33;
+  color: var(--text);
+  cursor: pointer;
+  text-align: left;
+  transition: border-color 0.18s ease, background 0.18s ease, transform 0.18s ease;
+}
+
+.sales-audit-tile:hover,
+.sales-audit-tile.active {
+  border-color: var(--primary);
+  background: #172a4d;
+  transform: translateY(-1px);
+}
+
+.sales-audit-tile span,
+.sales-audit-tile small {
+  color: var(--text-soft);
+}
+
+.sales-audit-tile strong {
+  font-size: 1.2rem;
+}
+
+.sales-audit-note {
+  margin-top: 0.8rem;
+}
+
+.sales-audit-drilldown {
+  margin-top: 1rem;
+  padding: 1rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface-muted);
+}
+
+.sales-audit-drilldown h3 {
+  margin: 0 0 0.8rem;
+  font-size: 1rem;
+}
+
+.chapati-audit-card {
+  padding: 1rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface-muted);
+}
+
+.chapati-audit-stats {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.75rem;
+}
+
+.chapati-audit-stats div {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  padding: 0.8rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: #0f1b33;
+}
+
+.chapati-audit-stats span {
+  color: var(--text-soft);
+  font-size: 0.8rem;
+}
+
+.chapati-audit-stats strong {
+  font-size: 1.15rem;
+}
+
+.chapati-progress {
+  height: 12px;
+  margin-top: 1rem;
+  overflow: hidden;
+  border-radius: 999px;
+  background: #1f2a44;
+}
+
+.chapati-progress span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--primary);
+  transition: width 0.25s ease;
+}
+
+.sales-audit-line-chart {
+  height: 360px;
+}
+
+@media (max-width: 720px) {
+  .chapati-audit-stats {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 480px) {
+  .chapati-audit-stats {
+    grid-template-columns: 1fr;
+  }
+
+  .sales-audit-line-chart {
+    height: 300px;
+  }
+}
+
 
 .bar-preview-tab {
   flex: 1;

@@ -99,6 +99,65 @@ export type AuditRow = {
   revenue?: number;
 };
 
+export type SalesAuditCategoryKey =
+  | "ugali"
+  | "rice"
+  | "matumbo"
+  | "kuku"
+  | "mix"
+  | "fries"
+  | "managu";
+
+export type SalesAuditDish = {
+  item_id: number;
+  item_name: string;
+  plates: number;
+  revenue: number;
+};
+
+export type SalesAuditCategory = {
+  key: SalesAuditCategoryKey;
+  label: string;
+  plates: number;
+  revenue: number;
+  dishes: SalesAuditDish[];
+};
+
+export type SalesAuditSnackRow = {
+  item_id: number;
+  item_name: string;
+  entry_date: string;
+  added: number;
+  sold: number;
+  revenue: number;
+};
+
+export type SalesAuditSnackTotal = Omit<SalesAuditSnackRow, "entry_date">;
+
+export type SalesAuditDay = {
+  entry_date: string;
+  snacks: number;
+  drinks: number;
+  food: number;
+  kuku: number;
+  total: number;
+};
+
+export type SalesAuditReport = {
+  date_from: string;
+  date_to: string;
+  categories: SalesAuditCategory[];
+  chapati: {
+    cooked: number;
+    dish_plates: number;
+    chapatis_used: number;
+    pct: number;
+  };
+  snacks_added: SalesAuditSnackRow[];
+  snack_totals: SalesAuditSnackTotal[];
+  timeseries: SalesAuditDay[];
+};
+
 export type AnalyticsRange = "yesterday" | "7d" | "30d" | "90d";
 export type AnalyticsCategory = "snacks" | "drinks" | "food" | "kuku";
 

@@ -12,6 +12,7 @@ export {
   fetchStockCatalog,
   addStockCatalogItem,
   fetchInventoryAudit,
+  fetchSalesAudit,
   fetchEmployees,
   updateEmployeeHotelRole,
 } from "./admin";
