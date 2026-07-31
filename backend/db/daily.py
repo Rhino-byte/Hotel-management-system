@@ -383,7 +383,7 @@ def save_food_kuku_daily(
                      0
                    ) AS price_ksh
                 """,
-                (item_id, entry_date),
+                (item_id, entry_date, item_id),
             ).fetchone()
             price = float(price_row["price_ksh"])
             total_revenue += quantity * price
