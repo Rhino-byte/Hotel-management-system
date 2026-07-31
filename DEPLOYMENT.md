@@ -14,6 +14,30 @@
    - `LOGIN_RATE_LIMIT_MAX` — optional, default `5` failed attempts
    - `LOGIN_RATE_LIMIT_WINDOW_SEC` — optional, default `900` (15 minutes)
 
+### Keep Neon warm (reduce idle `Failed to fetch`)
+
+Neon can suspend compute after idle even when the Render API is on Starter. Ping the DB through the API every few minutes.
+
+**Option 1 — Render Cron (Blueprint)**
+
+[`backend/render.yaml`](backend/render.yaml) defines `hotel-api-keepwarm`, which runs `python scripts/keep_warm.py` every 5 minutes.
+
+1. Sync/apply the Blueprint (or create a Cron Job manually with Root Directory `backend`).
+2. Set cron env var `HEALTH_PING_URL` to your API ready URL, e.g. `https://hotel-api.onrender.com/api/health/ready`.
+3. Confirm in cron logs that pings return `200` (or occasional `503` while Neon is waking — the script treats `503` as a successful wake attempt).
+
+Manual one-off test:
+
+```bash
+cd backend
+export HEALTH_PING_URL="https://your-api.onrender.com/api/health/ready"
+python scripts/keep_warm.py
+```
+
+**Option 2 — External monitor**
+
+Point UptimeRobot / cron-job.org at `GET https://your-api.onrender.com/api/health/ready` every 5–10 minutes.
+
 ### First-time DB setup
 
 ```bash
@@ -99,8 +123,9 @@ python scripts/hash_password.py "your-password"
 
 ### Symptom: first request after idle is very slow or times out
 
-- Render free tier **cold starts** can take 30–60 seconds. Retry or upgrade the plan.
-- Ping `/api/health` periodically if you need the service warm.
+- Render **Free** web instances spin down after ~15 minutes idle (cold start ~1 minute). Starter+ web instances stay up.
+- **Neon** can still suspend after idle; use the keep-warm cron (`/api/health/ready`) described above, or disable Neon auto-suspend if your plan allows.
+- Ping `/api/health` only checks the API process; use `/api/health/ready` to touch Postgres.
 
 ### Symptom: CORS errors in the browser (not HTTP 500)
 

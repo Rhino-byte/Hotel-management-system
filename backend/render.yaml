@@ -14,3 +14,17 @@ services:
         sync: false
       - key: APP_ENV
         value: production
+
+  # Keeps Neon from suspending: hits /api/health/ready every 5 minutes.
+  - type: cron
+    name: hotel-api-keepwarm
+    rootDir: backend
+    runtime: python
+    schedule: "*/5 * * * *"
+    buildCommand: pip install -r requirements.txt
+    startCommand: python scripts/keep_warm.py
+    envVars:
+      - key: HEALTH_PING_URL
+        sync: false
+      - key: HEALTH_PING_TIMEOUT_SEC
+        value: "60"

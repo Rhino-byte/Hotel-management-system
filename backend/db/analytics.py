@@ -45,13 +45,17 @@ def sales_totals(date_from: date, date_to: date) -> dict[str, Any]:
                        0
                      )
                      * COALESCE(
-                       (SELECT ip.price_ksh FROM item_prices ip
-                        WHERE ip.item_id = i.id
-                          AND ip.effective_from <= cur.entry_date
-                        ORDER BY ip.effective_from DESC, ip.id DESC
-                        LIMIT 1),
-                       0
-                     )
+                     (SELECT ip.price_ksh FROM item_prices ip
+                      WHERE ip.item_id = i.id
+                        AND ip.effective_from <= cur.entry_date
+                      ORDER BY ip.effective_from DESC, ip.id DESC
+                      LIMIT 1),
+                     (SELECT ip.price_ksh FROM item_prices ip
+                      WHERE ip.item_id = i.id
+                      ORDER BY ip.effective_from ASC, ip.id ASC
+                      LIMIT 1),
+                     0
+                   )
                    ) AS revenue
             FROM snacks_drinks_daily cur
             JOIN items i ON i.id = cur.item_id
@@ -84,13 +88,17 @@ def sales_totals(date_from: date, date_to: date) -> dict[str, Any]:
               SUM(
                 COALESCE(f.quantity, 0)
                 * COALESCE(
-                  (SELECT ip.price_ksh FROM item_prices ip
-                   WHERE ip.item_id = i.id
-                     AND ip.effective_from <= f.entry_date
-                   ORDER BY ip.effective_from DESC, ip.id DESC
-                   LIMIT 1),
-                  0
-                )
+                     (SELECT ip.price_ksh FROM item_prices ip
+                      WHERE ip.item_id = i.id
+                        AND ip.effective_from <= f.entry_date
+                      ORDER BY ip.effective_from DESC, ip.id DESC
+                      LIMIT 1),
+                     (SELECT ip.price_ksh FROM item_prices ip
+                      WHERE ip.item_id = i.id
+                      ORDER BY ip.effective_from ASC, ip.id ASC
+                      LIMIT 1),
+                     0
+                   )
               ) AS revenue
             FROM food_kuku_daily f
             JOIN items i ON i.id = f.item_id
@@ -137,13 +145,17 @@ def items_sold(category: str, entry_date: date) -> dict[str, Any]:
                          0
                        )
                        * COALESCE(
-                         (SELECT ip.price_ksh FROM item_prices ip
-                          WHERE ip.item_id = i.id
-                            AND ip.effective_from <= cur.entry_date
-                          ORDER BY ip.effective_from DESC, ip.id DESC
-                          LIMIT 1),
-                         0
-                       ) AS revenue
+                     (SELECT ip.price_ksh FROM item_prices ip
+                      WHERE ip.item_id = i.id
+                        AND ip.effective_from <= cur.entry_date
+                      ORDER BY ip.effective_from DESC, ip.id DESC
+                      LIMIT 1),
+                     (SELECT ip.price_ksh FROM item_prices ip
+                      WHERE ip.item_id = i.id
+                      ORDER BY ip.effective_from ASC, ip.id ASC
+                      LIMIT 1),
+                     0
+                   ) AS revenue
                 FROM snacks_drinks_daily cur
                 JOIN items i ON i.id = cur.item_id
                 LEFT JOIN snacks_drinks_daily prev
@@ -175,13 +187,17 @@ def items_sold(category: str, entry_date: date) -> dict[str, Any]:
                        COALESCE(f.quantity, 0) AS sold_units,
                        COALESCE(f.quantity, 0)
                        * COALESCE(
-                         (SELECT ip.price_ksh FROM item_prices ip
-                          WHERE ip.item_id = i.id
-                            AND ip.effective_from <= f.entry_date
-                          ORDER BY ip.effective_from DESC, ip.id DESC
-                          LIMIT 1),
-                         0
-                       ) AS revenue
+                     (SELECT ip.price_ksh FROM item_prices ip
+                      WHERE ip.item_id = i.id
+                        AND ip.effective_from <= f.entry_date
+                      ORDER BY ip.effective_from DESC, ip.id DESC
+                      LIMIT 1),
+                     (SELECT ip.price_ksh FROM item_prices ip
+                      WHERE ip.item_id = i.id
+                      ORDER BY ip.effective_from ASC, ip.id ASC
+                      LIMIT 1),
+                     0
+                   ) AS revenue
                 FROM food_kuku_daily f
                 JOIN items i ON i.id = f.item_id
                 WHERE f.entry_date = %s

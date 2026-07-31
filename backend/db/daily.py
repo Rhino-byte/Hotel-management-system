@@ -100,6 +100,10 @@ def get_snacks_drinks_daily(entry_date: date) -> list[dict[str, Any]]:
                         AND ip.effective_from <= %s
                       ORDER BY ip.effective_from DESC, ip.id DESC
                       LIMIT 1),
+                     (SELECT ip.price_ksh FROM item_prices ip
+                      WHERE ip.item_id = i.id
+                      ORDER BY ip.effective_from ASC, ip.id ASC
+                      LIMIT 1),
                      0
                    ) AS price_ksh,
                    cur.id AS record_id
@@ -278,6 +282,10 @@ def get_food_kuku_daily(entry_date: date) -> list[dict[str, Any]]:
                         AND ip.effective_from <= %s
                       ORDER BY ip.effective_from DESC, ip.id DESC
                       LIMIT 1),
+                     (SELECT ip.price_ksh FROM item_prices ip
+                      WHERE ip.item_id = i.id
+                      ORDER BY ip.effective_from ASC, ip.id ASC
+                      LIMIT 1),
                      0
                    ) AS price_ksh,
                    d.id AS record_id
@@ -289,7 +297,13 @@ def get_food_kuku_daily(entry_date: date) -> list[dict[str, Any]]:
             """,
             (entry_date, entry_date),
         ).fetchall()
-        return [dict(r) for r in rows]
+        out = []
+        for r in rows:
+            row = dict(r)
+            row["quantity"] = float(row.get("quantity") or 0)
+            row["price_ksh"] = float(row.get("price_ksh") or 0)
+            out.append(row)
+        return out
 
 
 def save_food_kuku_daily(
@@ -357,13 +371,17 @@ def save_food_kuku_daily(
             price_row = conn.execute(
                 """
                 SELECT COALESCE(
-                  (SELECT ip.price_ksh FROM item_prices ip
-                   WHERE ip.item_id = %s
-                     AND ip.effective_from <= %s
-                   ORDER BY ip.effective_from DESC, ip.id DESC
-                   LIMIT 1),
-                  0
-                ) AS price_ksh
+                     (SELECT ip.price_ksh FROM item_prices ip
+                      WHERE ip.item_id = %s
+                        AND ip.effective_from <= %s
+                      ORDER BY ip.effective_from DESC, ip.id DESC
+                      LIMIT 1),
+                     (SELECT ip.price_ksh FROM item_prices ip
+                      WHERE ip.item_id = %s
+                      ORDER BY ip.effective_from ASC, ip.id ASC
+                      LIMIT 1),
+                     0
+                   ) AS price_ksh
                 """,
                 (item_id, entry_date),
             ).fetchone()
@@ -573,6 +591,10 @@ def get_bar_daily(entry_date: date) -> list[dict[str, Any]]:
                       WHERE ip.item_id = i.id
                         AND ip.effective_from <= %s
                       ORDER BY ip.effective_from DESC, ip.id DESC
+                      LIMIT 1),
+                     (SELECT ip.price_ksh FROM item_prices ip
+                      WHERE ip.item_id = i.id
+                      ORDER BY ip.effective_from ASC, ip.id ASC
                       LIMIT 1),
                      0
                    ) AS price_ksh,
@@ -789,6 +811,10 @@ def get_inventory_audit(
                         AND ip.effective_from <= d.entry_date
                       ORDER BY ip.effective_from DESC, ip.id DESC
                       LIMIT 1),
+                     (SELECT ip.price_ksh FROM item_prices ip
+                      WHERE ip.item_id = il.id
+                      ORDER BY ip.effective_from ASC, ip.id ASC
+                      LIMIT 1),
                      0
                    ) AS price_ksh
             FROM items_list il
@@ -856,18 +882,26 @@ def _food_kuku_audit(date_from: date, date_to: date) -> list[dict[str, Any]]:
                         AND ip.effective_from <= d.entry_date
                       ORDER BY ip.effective_from DESC, ip.id DESC
                       LIMIT 1),
+                     (SELECT ip.price_ksh FROM item_prices ip
+                      WHERE ip.item_id = il.id
+                      ORDER BY ip.effective_from ASC, ip.id ASC
+                      LIMIT 1),
                      0
                    ) AS price_ksh,
                    CASE
                      WHEN f.id IS NULL THEN NULL
                      ELSE COALESCE(f.quantity, 0) * COALESCE(
-                       (SELECT ip.price_ksh FROM item_prices ip
-                        WHERE ip.item_id = il.id
-                          AND ip.effective_from <= d.entry_date
-                        ORDER BY ip.effective_from DESC, ip.id DESC
-                        LIMIT 1),
-                       0
-                     )
+                     (SELECT ip.price_ksh FROM item_prices ip
+                      WHERE ip.item_id = il.id
+                        AND ip.effective_from <= d.entry_date
+                      ORDER BY ip.effective_from DESC, ip.id DESC
+                      LIMIT 1),
+                     (SELECT ip.price_ksh FROM item_prices ip
+                      WHERE ip.item_id = il.id
+                      ORDER BY ip.effective_from ASC, ip.id ASC
+                      LIMIT 1),
+                     0
+                   )
                    END AS revenue
             FROM items_list il
             CROSS JOIN dates d
@@ -901,6 +935,10 @@ def _bar_audit(date_from: date, date_to: date) -> list[dict[str, Any]]:
                       WHERE ip.item_id = il.id
                         AND ip.effective_from <= d.entry_date
                       ORDER BY ip.effective_from DESC, ip.id DESC
+                      LIMIT 1),
+                     (SELECT ip.price_ksh FROM item_prices ip
+                      WHERE ip.item_id = il.id
+                      ORDER BY ip.effective_from ASC, ip.id ASC
                       LIMIT 1),
                      0
                    ) AS price_ksh

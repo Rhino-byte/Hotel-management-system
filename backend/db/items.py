@@ -1,6 +1,14 @@
 from typing import Any, Optional
 
 from db.connection import get_conn
+from db.price_sql import CATALOG_PRICE_EPOCH, hotel_today
+
+
+def _with_float_price(row: dict[str, Any]) -> dict[str, Any]:
+    out = dict(row)
+    if "price_ksh" in out and out["price_ksh"] is not None:
+        out["price_ksh"] = float(out["price_ksh"])
+    return out
 
 
 def list_items_by_group(group_type: str, active_only: bool = True) -> list[dict[str, Any]]:
@@ -22,7 +30,7 @@ def list_items_by_group(group_type: str, active_only: bool = True) -> list[dict[
     query += " ORDER BY i.name"
     with get_conn() as conn:
         rows = conn.execute(query, params).fetchall()
-        return [dict(r) for r in rows]
+        return [_with_float_price(dict(r)) for r in rows]
 
 
 def get_item(item_id: int) -> Optional[dict[str, Any]]:
@@ -48,13 +56,13 @@ def create_food_item(
             (name,),
         ).fetchone()
         item = dict(row)
-        # Always insert a new price row so historical as-of lookups stay intact.
+        # First catalog price is backdated so it applies on any entry date.
         conn.execute(
             """
-            INSERT INTO item_prices (item_id, price_ksh, updated_by)
-            VALUES (%s, %s, %s)
+            INSERT INTO item_prices (item_id, price_ksh, effective_from, updated_by)
+            VALUES (%s, %s, %s, %s)
             """,
-            (item["id"], price_ksh, user_id),
+            (item["id"], price_ksh, CATALOG_PRICE_EPOCH, user_id),
         )
         conn.commit()
         item["price_ksh"] = float(price_ksh)
@@ -81,13 +89,13 @@ def create_snacks_drinks_item(
             (name, subcategory),
         ).fetchone()
         item = dict(row)
-        # Always insert a new price row so historical as-of lookups stay intact.
+        # First catalog price is backdated so it applies on any entry date.
         conn.execute(
             """
-            INSERT INTO item_prices (item_id, price_ksh, updated_by)
-            VALUES (%s, %s, %s)
+            INSERT INTO item_prices (item_id, price_ksh, effective_from, updated_by)
+            VALUES (%s, %s, %s, %s)
             """,
-            (item["id"], price_ksh, user_id),
+            (item["id"], price_ksh, CATALOG_PRICE_EPOCH, user_id),
         )
         conn.commit()
         item["price_ksh"] = float(price_ksh)
@@ -117,10 +125,10 @@ def create_stock_item(name: str, user_id: Optional[int] = None) -> dict[str, Any
         if not existing_price:
             conn.execute(
                 """
-                INSERT INTO item_prices (item_id, price_ksh, updated_by)
-                VALUES (%s, 0, %s)
+                INSERT INTO item_prices (item_id, price_ksh, effective_from, updated_by)
+                VALUES (%s, 0, %s, %s)
                 """,
-                (item["id"], user_id),
+                (item["id"], CATALOG_PRICE_EPOCH, user_id),
             )
         conn.commit()
         return item
@@ -158,21 +166,23 @@ def list_all_items_with_prices() -> list[dict[str, Any]]:
             ORDER BY i.group_type, i.subcategory NULLS LAST, i.display_order, i.name
             """
         ).fetchall()
-        return [dict(r) for r in rows]
+        return [_with_float_price(dict(r)) for r in rows]
 
 
 def update_item_price(item_id: int, price_ksh: float, user_id: int) -> dict[str, Any]:
     with get_conn() as conn:
         row = conn.execute(
             """
-            INSERT INTO item_prices (item_id, price_ksh, updated_by)
-            VALUES (%s, %s, %s)
+            INSERT INTO item_prices (item_id, price_ksh, effective_from, updated_by)
+            VALUES (%s, %s, %s, %s)
             RETURNING id, item_id, price_ksh, effective_from
             """,
-            (item_id, price_ksh, user_id),
+            (item_id, price_ksh, hotel_today(), user_id),
         ).fetchone()
         conn.commit()
-        return dict(row)
+        result = dict(row)
+        result["price_ksh"] = float(result["price_ksh"])
+        return result
 
 
 def update_item_subcategory(item_id: int, subcategory: str) -> dict[str, Any]:
@@ -231,8 +241,11 @@ def upsert_catalog_item(
             )
         else:
             conn.execute(
-                "INSERT INTO item_prices (item_id, price_ksh) VALUES (%s, %s)",
-                (item_id, price_ksh),
+                """
+                INSERT INTO item_prices (item_id, price_ksh, effective_from)
+                VALUES (%s, %s, %s)
+                """,
+                (item_id, price_ksh, CATALOG_PRICE_EPOCH),
             )
         conn.commit()
         return item_id

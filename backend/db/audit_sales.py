@@ -25,11 +25,14 @@ def _food_rows(date_from: date, date_to: date) -> list[dict[str, Any]]:
             SELECT f.entry_date, i.id AS item_id, i.name AS item_name,
                    COALESCE(f.quantity, 0) AS quantity,
                    COALESCE(
-                     (SELECT ip.price_ksh
-                      FROM item_prices ip
+                     (SELECT ip.price_ksh FROM item_prices ip
                       WHERE ip.item_id = i.id
                         AND ip.effective_from <= f.entry_date
                       ORDER BY ip.effective_from DESC, ip.id DESC
+                      LIMIT 1),
+                     (SELECT ip.price_ksh FROM item_prices ip
+                      WHERE ip.item_id = i.id
+                      ORDER BY ip.effective_from ASC, ip.id ASC
                       LIMIT 1),
                      0
                    ) AS price_ksh
@@ -55,11 +58,14 @@ def _snacks_rows(date_from: date, date_to: date) -> list[dict[str, Any]]:
                    COALESCE(cur.added_stock, 0) AS added_stock,
                    cur.closing_stock,
                    COALESCE(
-                     (SELECT ip.price_ksh
-                      FROM item_prices ip
+                     (SELECT ip.price_ksh FROM item_prices ip
                       WHERE ip.item_id = i.id
                         AND ip.effective_from <= cur.entry_date
                       ORDER BY ip.effective_from DESC, ip.id DESC
+                      LIMIT 1),
+                     (SELECT ip.price_ksh FROM item_prices ip
+                      WHERE ip.item_id = i.id
+                      ORDER BY ip.effective_from ASC, ip.id ASC
                       LIMIT 1),
                      0
                    ) AS price_ksh
