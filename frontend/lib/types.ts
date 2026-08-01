@@ -155,6 +155,8 @@ export type SalesAuditReport = {
   };
   snacks_added: SalesAuditSnackRow[];
   snack_totals: SalesAuditSnackTotal[];
+  drinks_added: SalesAuditSnackRow[];
+  drink_totals: SalesAuditSnackTotal[];
   timeseries: SalesAuditDay[];
 };
 

@@ -143,8 +143,10 @@ def sales_report(date_from: date, date_to: date) -> dict[str, Any]:
             dish["revenue"] += revenue
 
     snacks_added: list[dict[str, Any]] = []
+    drinks_added: list[dict[str, Any]] = []
     chapati_cooked = 0.0
     snack_totals: dict[int, dict[str, Any]] = {}
+    drink_totals: dict[int, dict[str, Any]] = {}
 
     for row in snacks_rows:
         item_id = int(row["item_id"])
@@ -186,6 +188,31 @@ def sales_report(date_from: date, date_to: date) -> dict[str, Any]:
                         "revenue": revenue,
                     }
                 )
+        elif subcategory == "drinks":
+            total = drink_totals.setdefault(
+                item_id,
+                {
+                    "item_id": item_id,
+                    "item_name": item_name,
+                    "added": 0.0,
+                    "sold": 0.0,
+                    "revenue": 0.0,
+                },
+            )
+            total["added"] += added
+            total["sold"] += sold
+            total["revenue"] += revenue
+            if added > 0:
+                drinks_added.append(
+                    {
+                        "item_id": item_id,
+                        "item_name": item_name,
+                        "entry_date": entry_date,
+                        "added": added,
+                        "sold": sold,
+                        "revenue": revenue,
+                    }
+                )
 
     category_results = []
     for category in category_totals.values():
@@ -215,6 +242,10 @@ def sales_report(date_from: date, date_to: date) -> dict[str, Any]:
         "snacks_added": snacks_added,
         "snack_totals": sorted(
             snack_totals.values(), key=lambda row: row["item_name"].casefold()
+        ),
+        "drinks_added": drinks_added,
+        "drink_totals": sorted(
+            drink_totals.values(), key=lambda row: row["item_name"].casefold()
         ),
         "timeseries": list(timeseries.values()),
     }

@@ -98,6 +98,16 @@ export default function AdminAuditPage() {
     return Array.from(groups.entries());
   }, [report]);
 
+  const drinkGroups = useMemo(() => {
+    const groups = new Map<number, SalesAuditSnackRow[]>();
+    for (const row of report?.drinks_added ?? []) {
+      const rows = groups.get(row.item_id) ?? [];
+      rows.push(row);
+      groups.set(row.item_id, rows);
+    }
+    return Array.from(groups.entries());
+  }, [report]);
+
   if (loading) return <LoadingScreen />;
   if (!user || user.role !== "admin") return null;
 
@@ -116,7 +126,7 @@ export default function AdminAuditPage() {
           <div>
             <h1 className="page-title">Sales Audit</h1>
             <p className="page-subtitle">
-              Track plate sales, chapati use, snacks added and daily revenue.
+              Track plate sales, chapati use, snacks and drinks added, and daily revenue.
             </p>
           </div>
         </div>
@@ -457,6 +467,62 @@ export default function AdminAuditPage() {
                           >
                             <td>{rows[0].item_name} total</td>
                             <td>{report.date_from} → {report.date_to}</td>
+                            <td>{formatNumber(rangeTotal?.added ?? 0)}</td>
+                            <td>{formatNumber(rangeTotal?.sold ?? 0)}</td>
+                            <td>{formatKsh(rangeTotal?.revenue ?? 0)}</td>
+                          </tr>,
+                        ];
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </section>
+
+            <section className="analytics-section">
+              <div className="analytics-section-head">
+                <h2 className="analytics-section-title">Drinks added</h2>
+              </div>
+              <p className="analytics-meta">
+                Drink stock additions during the selected range, with range totals per item.
+              </p>
+              {drinkGroups.length === 0 ? (
+                <p className="empty-state">No drinks were added in this range.</p>
+              ) : (
+                <div className="table-wrap">
+                  <table className="data-table">
+                    <thead>
+                      <tr>
+                        <th>Item</th>
+                        <th>Date</th>
+                        <th>Added</th>
+                        <th>Sold</th>
+                        <th>Revenue (KSh)</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {drinkGroups.flatMap(([itemId, rows]) => {
+                        const rangeTotal = report.drink_totals.find(
+                          (row) => row.item_id === itemId
+                        );
+                        return [
+                          ...rows.map((row) => (
+                            <tr key={`drink-${row.item_id}-${row.entry_date}`}>
+                              <td>{row.item_name}</td>
+                              <td>{row.entry_date}</td>
+                              <td>{formatNumber(row.added)}</td>
+                              <td>{formatNumber(row.sold)}</td>
+                              <td>{formatKsh(row.revenue)}</td>
+                            </tr>
+                          )),
+                          <tr
+                            key={`drink-${itemId}-total`}
+                            className="analytics-summary-total"
+                          >
+                            <td>{rows[0].item_name} total</td>
+                            <td>
+                              {report.date_from} → {report.date_to}
+                            </td>
                             <td>{formatNumber(rangeTotal?.added ?? 0)}</td>
                             <td>{formatNumber(rangeTotal?.sold ?? 0)}</td>
                             <td>{formatKsh(rangeTotal?.revenue ?? 0)}</td>
