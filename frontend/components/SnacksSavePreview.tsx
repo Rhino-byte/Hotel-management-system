@@ -16,9 +16,15 @@ type Props = {
   entries: SnacksEntry[];
   dirtyIds: Set<number>;
   saving: boolean;
+  mode?: "review" | "summary";
   onCancel: () => void;
-  onConfirm: () => void;
+  onConfirm?: () => void;
 };
+
+/** Rows with a numeric Amount (includes 0.00); excludes — and negatives. */
+function rowsWithAmount(rows: SnacksEntry[]): SnacksEntry[] {
+  return rows.filter((e) => e.revenue != null && Number(e.revenue) >= 0);
+}
 
 function ReportTable({
   rows,
@@ -79,12 +85,10 @@ function ReportTable({
                   })}
                 </td>
                 <td>
-                  {row.revenue != null
-                    ? Number(row.revenue).toLocaleString(undefined, {
-                        minimumFractionDigits: 2,
-                        maximumFractionDigits: 2,
-                      })
-                    : "—"}
+                  {Number(row.revenue).toLocaleString(undefined, {
+                    minimumFractionDigits: 2,
+                    maximumFractionDigits: 2,
+                  })}
                 </td>
               </tr>
             );
@@ -100,11 +104,15 @@ export default function SnacksSavePreview({
   entries,
   dirtyIds,
   saving,
+  mode = "review",
   onCancel,
   onConfirm,
 }: Props) {
-  const [tab, setTab] = useState<"changes" | "full">("changes");
+  const [tab, setTab] = useState<"changes" | "full">(
+    mode === "summary" ? "full" : "changes"
+  );
   const [soldOutAck, setSoldOutAck] = useState(false);
+  const isSummary = mode === "summary";
 
   const soldOutRows = soldOutDirtyEntries(entries, dirtyIds);
   const overClosingRows = overClosingDirtyEntries(entries, dirtyIds);
@@ -112,12 +120,16 @@ export default function SnacksSavePreview({
   const dirtyMissingClosing = dirtyEntries.filter((e) => !isClosingSet(e));
   const closingSet = countClosingSet(entries);
   const unsetWithStock = unsetClosingWithStock(entries);
-  const needsSoldOutAck = soldOutRows.length > 0;
+  const previewEntries = rowsWithAmount(entries);
+  const previewDirtyEntries = rowsWithAmount(dirtyEntries);
+  const needsSoldOutAck = !isSummary && soldOutRows.length > 0;
   const canConfirm =
+    !isSummary &&
     dirtyIds.size > 0 &&
     dirtyMissingClosing.length === 0 &&
     overClosingRows.length === 0 &&
-    (!needsSoldOutAck || soldOutAck);
+    (!needsSoldOutAck || soldOutAck) &&
+    Boolean(onConfirm);
 
   return (
     <div
@@ -130,11 +142,13 @@ export default function SnacksSavePreview({
         <div className="modal-header">
           <div>
             <h2 id="snacks-preview-title" className="modal-title">
-              Review before save
+              {isSummary ? "Finalized day summary" : "Review before save"}
             </h2>
             <p className="modal-subtitle">
-              {date} · {closingSet}/{entries.length} closing set · {dirtyIds.size} row
-              {dirtyIds.size === 1 ? "" : "s"} to save
+              {date} · {closingSet}/{entries.length} closing set
+              {!isSummary
+                ? ` · ${dirtyIds.size} row${dirtyIds.size === 1 ? "" : "s"} to save`
+                : ""}
             </p>
           </div>
           <button
@@ -143,17 +157,17 @@ export default function SnacksSavePreview({
             onClick={onCancel}
             disabled={saving}
           >
-            Cancel
+            {isSummary ? "Close" : "Cancel"}
           </button>
         </div>
 
-        {dirtyIds.size === 0 && (
+        {!isSummary && dirtyIds.size === 0 && (
           <div className="alert error">
             No changes to save. Edit Add or Closing on items first.
           </div>
         )}
 
-        {dirtyMissingClosing.length > 0 && (
+        {!isSummary && dirtyMissingClosing.length > 0 && (
           <div className="alert error">
             {dirtyMissingClosing.length} edited row(s) still need Closing before saving:{" "}
             {dirtyMissingClosing.map((r) => r.name).join(", ")}
@@ -167,14 +181,14 @@ export default function SnacksSavePreview({
           </div>
         )}
 
-        {soldOutRows.length > 0 && (
+        {!isSummary && soldOutRows.length > 0 && (
           <div className="alert error">
             {soldOutRows.length} item(s) marked sold out (Closing = 0 with stock remaining):{" "}
             {soldOutRows.map((r) => r.name).join(", ")}
           </div>
         )}
 
-        {overClosingRows.length > 0 && (
+        {!isSummary && overClosingRows.length > 0 && (
           <div className="alert error">
             {overClosingRows.length} item(s) have Closing greater than Total (impossible):{" "}
             {overClosingRows.map((r) => r.name).join(", ")}. Reduce Closing or increase Add
@@ -182,31 +196,38 @@ export default function SnacksSavePreview({
           </div>
         )}
 
-        <div className="bar-preview-tabs">
-          <button
-            type="button"
-            className={tab === "changes" ? "bar-preview-tab active" : "bar-preview-tab"}
-            onClick={() => setTab("changes")}
-          >
-            Changes ({dirtyIds.size})
-          </button>
-          <button
-            type="button"
-            className={tab === "full" ? "bar-preview-tab active" : "bar-preview-tab"}
-            onClick={() => setTab("full")}
-          >
-            Full report ({entries.length})
-          </button>
-        </div>
+        {!isSummary && (
+          <div className="bar-preview-tabs">
+            <button
+              type="button"
+              className={tab === "changes" ? "bar-preview-tab active" : "bar-preview-tab"}
+              onClick={() => setTab("changes")}
+            >
+              Changes ({previewDirtyEntries.length})
+            </button>
+            <button
+              type="button"
+              className={tab === "full" ? "bar-preview-tab active" : "bar-preview-tab"}
+              onClick={() => setTab("full")}
+            >
+              Full report ({previewEntries.length})
+            </button>
+          </div>
+        )}
 
-        {tab === "changes" ? (
-          dirtyEntries.length > 0 ? (
-            <ReportTable rows={dirtyEntries} highlightIds={dirtyIds} />
+        {isSummary || tab === "full" ? (
+          previewEntries.length > 0 ? (
+            <ReportTable
+              rows={previewEntries}
+              highlightIds={isSummary ? undefined : dirtyIds}
+            />
           ) : (
-            <p className="empty-state">No edited rows.</p>
+            <p className="empty-state">No items with Amount set.</p>
           )
+        ) : previewDirtyEntries.length > 0 ? (
+          <ReportTable rows={previewDirtyEntries} highlightIds={dirtyIds} />
         ) : (
-          <ReportTable rows={entries} highlightIds={dirtyIds} warnUnset />
+          <p className="empty-state">No edited rows with Amount set.</p>
         )}
 
         {needsSoldOutAck && (
@@ -222,16 +243,18 @@ export default function SnacksSavePreview({
 
         <div className="modal-actions">
           <button type="button" className="btn btn-secondary" onClick={onCancel} disabled={saving}>
-            Back to entry
+            {isSummary ? "Close" : "Back to entry"}
           </button>
-          <button
-            type="button"
-            className="btn btn-primary"
-            onClick={onConfirm}
-            disabled={!canConfirm || saving}
-          >
-            {saving ? "Saving…" : "Confirm & save"}
-          </button>
+          {!isSummary && (
+            <button
+              type="button"
+              className="btn btn-primary"
+              onClick={onConfirm}
+              disabled={!canConfirm || saving}
+            >
+              {saving ? "Saving…" : "Confirm & save"}
+            </button>
+          )}
         </div>
       </div>
     </div>

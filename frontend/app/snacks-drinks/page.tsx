@@ -22,11 +22,15 @@ export default function SnacksDrinksPage() {
   const [dirtyIds, setDirtyIds] = useState<Set<number>>(new Set());
   const [entriesLoading, setEntriesLoading] = useState(false);
   const [loadedDate, setLoadedDate] = useState<string | null>(null);
+  const [locked, setLocked] = useState(false);
   const [saving, setSaving] = useState(false);
   const [previewOpen, setPreviewOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const fetchGenRef = useRef(0);
+
+  const isClerkLocked = locked && user?.role === "snacks_clerk";
+  const canEdit = !entriesLoading && loadedDate === date && !isClerkLocked;
 
   useEffect(() => {
     if (loading || !user) return;
@@ -37,13 +41,16 @@ export default function SnacksDrinksPage() {
     setError(null);
     setMessage(null);
     setPreviewOpen(false);
+    setLocked(false);
     setEntriesLoading(true);
     fetchSnacksDrinks(date)
       .then((d) => {
         if (gen !== fetchGenRef.current) return;
         const normalized = d.entries.map((e) => recomputeSnacksEntry(e));
         setEntries(normalized);
+        setLocked(Boolean(d.locked));
         setLoadedDate(date);
+        setPreviewOpen(Boolean(d.locked) && user.role === "snacks_clerk");
       })
       .catch((e) => {
         if (gen !== fetchGenRef.current) return;
@@ -55,8 +62,6 @@ export default function SnacksDrinksPage() {
         if (gen === fetchGenRef.current) setEntriesLoading(false);
       });
   }, [date, loading, user]);
-
-  const canEdit = !entriesLoading && loadedDate === date;
 
   const onChange = (
     itemId: number,
@@ -96,17 +101,21 @@ export default function SnacksDrinksPage() {
   const onConfirmSave = async () => {
     if (!canEdit || loadedDate !== date) return;
     const dirtyEntries = entries.filter((e) => dirtyIds.has(e.item_id));
+    const finalize = user?.role === "snacks_clerk";
     setSaving(true);
     setError(null);
     setMessage(null);
     try {
-      const res = await saveSnacksDrinks(date, dirtyEntries);
-      setMessage(`Saved ${res.saved} entries for ${date}.`);
+      const res = await saveSnacksDrinks(date, dirtyEntries, { finalize });
+      setMessage(
+        `Saved ${res.saved} entries for ${date}${res.locked ? " — day locked." : ""}.`
+      );
       setPreviewOpen(false);
       setDirtyIds(new Set());
       const refreshed = await fetchSnacksDrinks(date);
       const normalized = refreshed.entries.map((e) => recomputeSnacksEntry(e));
       setEntries(normalized);
+      setLocked(Boolean(refreshed.locked));
       setLoadedDate(date);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Save failed");
@@ -127,6 +136,7 @@ export default function SnacksDrinksPage() {
   );
 
   const tabTotals = snacksTotals(tabEntries);
+  const previewMode = isClerkLocked ? "summary" : "review";
 
   const carryDates = Array.from(
     new Set(
@@ -150,6 +160,11 @@ export default function SnacksDrinksPage() {
             </p>
           </div>
         </div>
+        {isClerkLocked && (
+          <div className="alert">
+            This day is locked (sales already recorded). Contact admin to make changes.
+          </div>
+        )}
         {error && <div className="alert error">{error}</div>}
         {message && <div className="alert success">{message}</div>}
         {carryDates.length > 0 && (
@@ -215,15 +230,21 @@ export default function SnacksDrinksPage() {
         {entriesLoading ? (
           <p className="empty-state">Loading entries…</p>
         ) : (
-          <SnacksStockGrid entries={filteredEntries} onChange={onChange} />
+          <SnacksStockGrid
+            entries={filteredEntries}
+            onChange={onChange}
+            readOnly={isClerkLocked || !canEdit}
+          />
         )}
-        <SaveButton
-          saving={saving}
-          disabled={!canEdit}
-          onClick={onReviewSave}
-          label={dirtyIds.size > 0 ? `Review & save (${dirtyIds.size})` : "Review & save"}
-          className="btn btn-primary"
-        />
+        {!isClerkLocked && (
+          <SaveButton
+            saving={saving}
+            disabled={!canEdit}
+            onClick={onReviewSave}
+            label={dirtyIds.size > 0 ? `Review & save (${dirtyIds.size})` : "Review & save"}
+            className="btn btn-primary"
+          />
+        )}
       </div>
       {previewOpen && (
         <SnacksSavePreview
@@ -231,8 +252,9 @@ export default function SnacksDrinksPage() {
           entries={entries}
           dirtyIds={dirtyIds}
           saving={saving}
+          mode={previewMode}
           onCancel={() => setPreviewOpen(false)}
-          onConfirm={onConfirmSave}
+          onConfirm={isClerkLocked ? undefined : onConfirmSave}
         />
       )}
     </main>

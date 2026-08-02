@@ -151,20 +151,36 @@ def _validate_snacks_closing_not_over_total(
 
 
 def save_snacks_drinks_daily(
-    entry_date: date, entries: list[dict[str, Any]], user_id: int
-) -> int:
+    entry_date: date,
+    entries: list[dict[str, Any]],
+    user_id: int,
+    *,
+    finalize: bool = False,
+    block_if_locked: bool = False,
+) -> dict[str, Any]:
     saved = 0
     with get_conn() as conn:
+        day_key = int(entry_date.strftime("%Y%m%d"))
+        conn.execute(
+            "SELECT pg_advisory_xact_lock(%s, %s)",
+            (_SNACKS_DRINKS_LOCK_NS, day_key),
+        )
+        if block_if_locked and is_snacks_drinks_day_locked(entry_date):
+            raise DayLockedError(
+                "This day already has sales recorded and cannot be edited."
+            )
+
         # Only persist rows with an explicit closing; never treat unset as 0.
         entries = [
             e for e in entries if e.get("closing_stock") is not None
         ]
-        if not entries:
-            return 0
-        _assert_items_in_group(
-            conn, [int(e["item_id"]) for e in entries], "snacks_drinks"
-        )
-        _validate_snacks_closing_not_over_total(conn, entry_date, entries)
+        if not entries and not finalize:
+            return {"saved": 0, "locked": is_snacks_drinks_day_locked(entry_date)}
+        if entries:
+            _assert_items_in_group(
+                conn, [int(e["item_id"]) for e in entries], "snacks_drinks"
+            )
+            _validate_snacks_closing_not_over_total(conn, entry_date, entries)
         for entry in entries:
             item_id = int(entry["item_id"])
             closing = float(entry["closing_stock"])
@@ -236,16 +252,27 @@ def save_snacks_drinks_daily(
                         changed_by=user_id,
                     )
             saved += 1
+
+        if finalize:
+            conn.execute(
+                """
+                INSERT INTO snacks_drinks_day_lock (entry_date, locked_by)
+                VALUES (%s, %s)
+                ON CONFLICT (entry_date) DO NOTHING
+                """,
+                (entry_date, user_id),
+            )
         conn.commit()
-    return saved
+    return {"saved": saved, "locked": is_snacks_drinks_day_locked(entry_date)}
 
 
 class DayLockedError(Exception):
-    """Raised when a food clerk tries to edit a finalized food & kuku day."""
+    """Raised when a clerk tries to edit a finalized day."""
 
 
-# Advisory-lock namespace for food_kuku day mutations (arbitrary stable int).
+# Advisory-lock namespaces for day mutations (arbitrary stable ints).
 _FOOD_KUKU_LOCK_NS = 8742001
+_SNACKS_DRINKS_LOCK_NS = 8742002
 
 
 def is_food_kuku_day_locked(entry_date: date) -> bool:
@@ -257,11 +284,40 @@ def is_food_kuku_day_locked(entry_date: date) -> bool:
         return row is not None
 
 
+def is_snacks_drinks_day_locked(entry_date: date) -> bool:
+    """True if an explicit lock row exists, or the day already has Total sales (KSh) > 0."""
+    with get_conn() as conn:
+        row = conn.execute(
+            "SELECT 1 FROM snacks_drinks_day_lock WHERE entry_date = %s",
+            (entry_date,),
+        ).fetchone()
+        if row is not None:
+            return True
+    rows = get_snacks_drinks_daily(entry_date)
+    total_revenue = sum(
+        float(r["revenue"]) for r in rows if r.get("revenue") is not None
+    )
+    return total_revenue > 0
+
+
 def lock_food_kuku_day(entry_date: date, user_id: int) -> None:
     with get_conn() as conn:
         conn.execute(
             """
             INSERT INTO food_kuku_day_lock (entry_date, locked_by)
+            VALUES (%s, %s)
+            ON CONFLICT (entry_date) DO NOTHING
+            """,
+            (entry_date, user_id),
+        )
+        conn.commit()
+
+
+def lock_snacks_drinks_day(entry_date: date, user_id: int) -> None:
+    with get_conn() as conn:
+        conn.execute(
+            """
+            INSERT INTO snacks_drinks_day_lock (entry_date, locked_by)
             VALUES (%s, %s)
             ON CONFLICT (entry_date) DO NOTHING
             """,

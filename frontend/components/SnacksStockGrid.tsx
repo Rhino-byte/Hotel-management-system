@@ -11,6 +11,7 @@ type Props = {
     field: "added_stock" | "closing_stock",
     value: number | null
   ) => void;
+  readOnly?: boolean;
 };
 
 function parseInput(value: string): number | null {
@@ -19,7 +20,7 @@ function parseInput(value: string): number | null {
   return Number.isNaN(n) ? null : n;
 }
 
-export default function SnacksStockGrid({ entries, onChange }: Props) {
+export default function SnacksStockGrid({ entries, onChange, readOnly = false }: Props) {
   const cardRows = entries.map((row) => ({
     item_id: row.item_id,
     name: row.name,
@@ -57,33 +58,41 @@ export default function SnacksStockGrid({ entries, onChange }: Props) {
                 <td>{row.name}</td>
                 <td>{formatSnacksCell(row.previous_closing)}</td>
                 <td>
-                  <input
-                    type="number"
-                    inputMode="numeric"
-                    min={0}
-                    step={1}
-                    className="input-cell input-cell-touch"
-                    value={row.added_stock ?? ""}
-                    placeholder="—"
-                    onChange={(e) =>
-                      onChange(row.item_id, "added_stock", parseInput(e.target.value))
-                    }
-                  />
+                  {readOnly ? (
+                    formatSnacksCell(row.added_stock)
+                  ) : (
+                    <input
+                      type="number"
+                      inputMode="numeric"
+                      min={0}
+                      step={1}
+                      className="input-cell input-cell-touch"
+                      value={row.added_stock ?? ""}
+                      placeholder="—"
+                      onChange={(e) =>
+                        onChange(row.item_id, "added_stock", parseInput(e.target.value))
+                      }
+                    />
+                  )}
                 </td>
                 <td>{formatSnacksCell(row.total_units)}</td>
                 <td>
-                  <input
-                    type="number"
-                    inputMode="numeric"
-                    min={0}
-                    step={1}
-                    className={`input-cell input-cell-touch${row.over_closing ? " input-cell-error" : ""}`}
-                    value={row.closing_stock ?? ""}
-                    placeholder="—"
-                    onChange={(e) =>
-                      onChange(row.item_id, "closing_stock", parseInput(e.target.value))
-                    }
-                  />
+                  {readOnly ? (
+                    formatSnacksCell(row.closing_stock)
+                  ) : (
+                    <input
+                      type="number"
+                      inputMode="numeric"
+                      min={0}
+                      step={1}
+                      className={`input-cell input-cell-touch${row.over_closing ? " input-cell-error" : ""}`}
+                      value={row.closing_stock ?? ""}
+                      placeholder="—"
+                      onChange={(e) =>
+                        onChange(row.item_id, "closing_stock", parseInput(e.target.value))
+                      }
+                    />
+                  )}
                 </td>
                 <td>{formatSnacksCell(row.sold_units)}</td>
                 <td>
@@ -105,7 +114,12 @@ export default function SnacksStockGrid({ entries, onChange }: Props) {
           </tbody>
         </table>
       </div>
-      <StockEntryCards rows={cardRows} formatCell={formatSnacksCell} onChange={onChange} />
+      <StockEntryCards
+        rows={cardRows}
+        formatCell={formatSnacksCell}
+        onChange={onChange}
+        readOnly={readOnly}
+      />
     </div>
   );
 }

@@ -7,14 +7,20 @@ export async function fetchSnacksDrinks(date: string) {
     entries: SnacksEntry[];
     total_sold_units: number;
     total_revenue: number;
+    locked: boolean;
   }>(`/api/snacks-drinks?date=${encodeURIComponent(date)}`);
 }
 
-export async function saveSnacksDrinks(date: string, entries: SnacksEntry[]) {
-  return apiFetch<{ saved: number }>("/api/snacks-drinks", {
+export async function saveSnacksDrinks(
+  date: string,
+  entries: SnacksEntry[],
+  options?: { finalize?: boolean }
+) {
+  return apiFetch<{ saved: number; locked: boolean; date: string }>("/api/snacks-drinks", {
     method: "POST",
     body: JSON.stringify({
       date,
+      finalize: options?.finalize ?? false,
       entries: entries
         .filter((e) => e.closing_stock !== null && e.closing_stock !== undefined)
         .map((e) => ({

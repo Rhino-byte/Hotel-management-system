@@ -18,6 +18,7 @@ import { fetchSalesAudit, todayIso } from "../../../lib/api";
 import { useRequireAuth } from "../../../lib/auth";
 import type {
   SalesAuditCategoryKey,
+  SalesAuditDay,
   SalesAuditReport,
   SalesAuditSnackRow,
 } from "../../../lib/types";
@@ -53,6 +54,46 @@ function daysAgo(days: number): string {
   const date = new Date();
   date.setDate(date.getDate() - days);
   return localIso(date);
+}
+
+function csvEscape(value: string | number): string {
+  const text = String(value);
+  if (/[",\n\r]/.test(text)) {
+    return `"${text.replace(/"/g, '""')}"`;
+  }
+  return text;
+}
+
+function dailySalesCsv(rows: SalesAuditDay[]): string {
+  const header = ["entry_date", "snacks", "drinks", "food", "kuku", "total"];
+  const lines = [
+    header.join(","),
+    ...rows.map((row) =>
+      [
+        row.entry_date,
+        row.snacks,
+        row.drinks,
+        row.food,
+        row.kuku,
+        row.total,
+      ]
+        .map(csvEscape)
+        .join(",")
+    ),
+  ];
+  return lines.join("\n");
+}
+
+function downloadTextFile(filename: string, content: string, mime = "text/csv;charset=utf-8") {
+  const blob = new Blob([content], { type: mime });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
 }
 
 export default function AdminAuditPage() {
@@ -117,6 +158,15 @@ export default function AdminAuditPage() {
   const setPreset = (from: string, to: string) => {
     setDateFrom(from);
     setDateTo(to);
+  };
+
+  const downloadDailySalesCsv = () => {
+    if (!report) return;
+    const csv = dailySalesCsv(report.timeseries);
+    downloadTextFile(
+      `daily-sales-${report.date_from}-to-${report.date_to}.csv`,
+      csv
+    );
   };
 
   return (
@@ -314,11 +364,21 @@ export default function AdminAuditPage() {
 
             <section className="analytics-section">
               <div className="analytics-section-head">
-                <h2 className="analytics-section-title">Total sales over time</h2>
+                <div>
+                  <h2 className="analytics-section-title">Total sales over time</h2>
+                  <p className="analytics-meta">
+                    Daily revenue for Snacks, Drinks, Food and Kuku. Bar sales are not
+                    included.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  className="btn btn-secondary"
+                  onClick={downloadDailySalesCsv}
+                >
+                  Download daily sales CSV
+                </button>
               </div>
-              <p className="analytics-meta">
-                Daily revenue for Snacks, Drinks, Food and Kuku. Bar sales are not included.
-              </p>
               <div className="analytics-chart sales-audit-line-chart">
                 <ResponsiveContainer width="100%" height="100%">
                   <LineChart

@@ -23,6 +23,7 @@ type Props = {
     field: "added_stock" | "closing_stock",
     value: number | null
   ) => void;
+  readOnly?: boolean;
 };
 
 function parseInput(value: string): number | null {
@@ -39,7 +40,12 @@ function formatMoney(value: number | null | undefined): string {
   });
 }
 
-export default function StockEntryCards({ rows, formatCell, onChange }: Props) {
+export default function StockEntryCards({
+  rows,
+  formatCell,
+  onChange,
+  readOnly = false,
+}: Props) {
   return (
     <div className="stock-entry-cards">
       {rows.map((row) => (
@@ -70,33 +76,43 @@ export default function StockEntryCards({ rows, formatCell, onChange }: Props) {
           <div className="stock-entry-card-fields">
             <label className="stock-entry-field">
               <span>Add</span>
-              <input
-                type="number"
-                inputMode="numeric"
-                min={0}
-                step={1}
-                className="input-cell input-cell-touch"
-                value={row.added_stock ?? ""}
-                placeholder="—"
-                onChange={(e) =>
-                  onChange(row.item_id, "added_stock", parseInput(e.target.value))
-                }
-              />
+              {readOnly ? (
+                <span className="input-cell input-cell-touch">{formatCell(row.added_stock)}</span>
+              ) : (
+                <input
+                  type="number"
+                  inputMode="numeric"
+                  min={0}
+                  step={1}
+                  className="input-cell input-cell-touch"
+                  value={row.added_stock ?? ""}
+                  placeholder="—"
+                  onChange={(e) =>
+                    onChange(row.item_id, "added_stock", parseInput(e.target.value))
+                  }
+                />
+              )}
             </label>
             <label className="stock-entry-field">
               <span>{row.endFieldLabel}</span>
-              <input
-                type="number"
-                inputMode="numeric"
-                min={0}
-                step={1}
-                className={`input-cell input-cell-touch${row.over_closing ? " input-cell-error" : ""}`}
-                value={row.closing_stock ?? ""}
-                placeholder="—"
-                onChange={(e) =>
-                  onChange(row.item_id, "closing_stock", parseInput(e.target.value))
-                }
-              />
+              {readOnly ? (
+                <span className="input-cell input-cell-touch">
+                  {formatCell(row.closing_stock)}
+                </span>
+              ) : (
+                <input
+                  type="number"
+                  inputMode="numeric"
+                  min={0}
+                  step={1}
+                  className={`input-cell input-cell-touch${row.over_closing ? " input-cell-error" : ""}`}
+                  value={row.closing_stock ?? ""}
+                  placeholder="—"
+                  onChange={(e) =>
+                    onChange(row.item_id, "closing_stock", parseInput(e.target.value))
+                  }
+                />
+              )}
             </label>
           </div>
         </article>
