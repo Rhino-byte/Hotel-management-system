@@ -4,6 +4,9 @@
 Used by the Render Cron Job in render.yaml (every 5 minutes).
 Set HEALTH_PING_URL to your deployed API ready endpoint, e.g.:
   https://hotel-api.onrender.com/api/health/ready
+
+Ready checks hotel DATABASE_URL and, when set, TRANSACTION_DATABASE_URL
+so both Neon projects stay warm.
 """
 
 from __future__ import annotations

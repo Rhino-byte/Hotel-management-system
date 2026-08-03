@@ -8,6 +8,7 @@ from psycopg.rows import dict_row
 from psycopg_pool import ConnectionPool
 
 _pool: Optional[ConnectionPool] = None
+_transaction_pool: Optional[ConnectionPool] = None
 _env_loaded = False
 
 
@@ -35,6 +36,21 @@ def get_database_url() -> str:
     return normalize_database_url(url)
 
 
+def get_transaction_database_url() -> Optional[str]:
+    """Return TRANSACTION_DATABASE_URL if configured, else None."""
+    load_env_file()
+    url = os.getenv("TRANSACTION_DATABASE_URL", "").strip()
+    if not url:
+        return None
+    return normalize_database_url(url)
+
+
+def get_tills_phone_number() -> Optional[str]:
+    load_env_file()
+    phone = os.getenv("PHONE_NUMBER", "").strip()
+    return phone or None
+
+
 def normalize_database_url(url: str) -> str:
     """Accept raw postgresql:// URLs or Neon-style `psql 'postgresql://...'` commands."""
     cleaned = url.strip().strip('"').strip("'")
@@ -51,6 +67,17 @@ def normalize_database_url(url: str) -> str:
     return cleaned
 
 
+def _pool_kwargs() -> dict:
+    # Neon / poolers drop idle SSL sockets; TCP keepalives reduce surprise closes.
+    return {
+        "row_factory": dict_row,
+        "keepalives": 1,
+        "keepalives_idle": 30,
+        "keepalives_interval": 10,
+        "keepalives_count": 3,
+    }
+
+
 def init_pool(min_size: int = 1, max_size: int = 10) -> None:
     global _pool
     if _pool is not None:
@@ -59,7 +86,11 @@ def init_pool(min_size: int = 1, max_size: int = 10) -> None:
         conninfo=get_database_url(),
         min_size=min_size,
         max_size=max_size,
-        kwargs={"row_factory": dict_row},
+        # Discard connections idle too long (Neon often closes ~5m).
+        max_idle=300,
+        # Verify connection is alive before handing it to the app.
+        check=ConnectionPool.check_connection,
+        kwargs=_pool_kwargs(),
     )
 
 
@@ -70,6 +101,31 @@ def close_pool() -> None:
         _pool = None
 
 
+def init_transaction_pool(min_size: int = 1, max_size: int = 5) -> None:
+    """Init optional pool for TRANSACTION_DATABASE_URL (Tills). No-op if unset."""
+    global _transaction_pool
+    if _transaction_pool is not None:
+        return
+    url = get_transaction_database_url()
+    if not url:
+        return
+    _transaction_pool = ConnectionPool(
+        conninfo=url,
+        min_size=min_size,
+        max_size=max_size,
+        max_idle=300,
+        check=ConnectionPool.check_connection,
+        kwargs=_pool_kwargs(),
+    )
+
+
+def close_transaction_pool() -> None:
+    global _transaction_pool
+    if _transaction_pool is not None:
+        _transaction_pool.close()
+        _transaction_pool = None
+
+
 def get_pool() -> ConnectionPool:
     if _pool is None:
         init_pool()
@@ -77,7 +133,22 @@ def get_pool() -> ConnectionPool:
     return _pool
 
 
+def get_transaction_pool() -> Optional[ConnectionPool]:
+    if _transaction_pool is None:
+        init_transaction_pool()
+    return _transaction_pool
+
+
 @contextmanager
 def get_conn() -> Generator[psycopg.Connection, None, None]:
     with get_pool().connection() as conn:
+        yield conn
+
+
+@contextmanager
+def get_transaction_conn() -> Generator[psycopg.Connection, None, None]:
+    pool = get_transaction_pool()
+    if pool is None:
+        raise RuntimeError("TRANSACTION_DATABASE_URL is not set")
+    with pool.connection() as conn:
         yield conn

@@ -4,6 +4,8 @@ const configured = (process.env.NEXT_PUBLIC_API_BASE || "").replace(/\/$/, "");
 const API_BASE =
   configured || (typeof window !== "undefined" ? "" : "http://localhost:8000");
 
+const RETRY_DELAY_MS = 800;
+
 function formatApiError(
   status: number,
   body: { detail?: string | { msg?: string }[] },
@@ -22,6 +24,22 @@ function formatApiError(
   return base;
 }
 
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function isNetworkError(err: unknown): boolean {
+  if (!(err instanceof TypeError)) return false;
+  const msg = (err.message || "").toLowerCase();
+  return (
+    msg.includes("failed to fetch") ||
+    msg.includes("networkerror") ||
+    msg.includes("network request failed") ||
+    msg.includes("load failed") ||
+    msg.includes("fetch failed")
+  );
+}
+
 export function getToken(): string | null {
   if (typeof window === "undefined") return null;
   return localStorage.getItem("hotel_token");
@@ -33,7 +51,7 @@ export function setToken(token: string | null) {
   else localStorage.removeItem("hotel_token");
 }
 
-export async function apiFetch<T>(path: string, options: RequestInit = {}): Promise<T> {
+async function apiFetchOnce<T>(path: string, options: RequestInit = {}): Promise<T> {
   const token = getToken();
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
@@ -62,12 +80,41 @@ export async function apiFetch<T>(path: string, options: RequestInit = {}): Prom
     }
     throw new Error(detail || "Unauthorized");
   }
+  if (res.status === 503) {
+    const err = new Error("Service Unavailable") as Error & { status?: number };
+    err.status = 503;
+    throw err;
+  }
   if (!res.ok) {
     const body = await res.json().catch(() => ({}));
     const target = `${API_BASE || (typeof window !== "undefined" ? window.location.origin : "")}${path}`;
     throw new Error(formatApiError(res.status, body, target));
   }
   return res.json() as Promise<T>;
+}
+
+export async function apiFetch<T>(path: string, options: RequestInit = {}): Promise<T> {
+  try {
+    return await apiFetchOnce<T>(path, options);
+  } catch (err) {
+    const retryable =
+      isNetworkError(err) ||
+      (err instanceof Error && (err as Error & { status?: number }).status === 503);
+    if (!retryable) throw err;
+    await sleep(RETRY_DELAY_MS);
+    try {
+      return await apiFetchOnce<T>(path, options);
+    } catch (retryErr) {
+      if (
+        retryErr instanceof Error &&
+        (retryErr as Error & { status?: number }).status === 503
+      ) {
+        const target = `${API_BASE || (typeof window !== "undefined" ? window.location.origin : "")}${path}`;
+        throw new Error(formatApiError(503, {}, target));
+      }
+      throw retryErr;
+    }
+  }
 }
 
 export function todayIso() {

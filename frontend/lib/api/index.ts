@@ -17,3 +17,4 @@ export {
   updateEmployeeHotelRole,
 } from "./admin";
 export { fetchSalesTotals, fetchDaySalesTotals, fetchItemsSold } from "./analytics";
+export { fetchTillsReport } from "./tills";

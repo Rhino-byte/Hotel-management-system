@@ -18,6 +18,7 @@ const ADMIN_LINKS = [
   { href: "/admin/stock-items", label: "Stock Catalog" },
   { href: "/admin/employees", label: "Employees" },
   { href: "/admin/audit", label: "Audit" },
+  { href: "/admin/tills", label: "Tills" },
 ];
 
 const CLERK_AUDIT_LINK = { href: "/admin/audit", label: "Audit" };

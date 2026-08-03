@@ -177,6 +177,23 @@ export type AnalyticsItemSold = {
   revenue: number;
 };
 
+export type TillsDay = {
+  day: string;
+  total: number;
+  sales_total: number;
+  pct: number;
+};
+
+export type TillsReport = {
+  date_from: string;
+  date_to: string;
+  phone_number: string;
+  period_total: number;
+  sales_period_total: number;
+  tills_pct: number;
+  timeseries: TillsDay[];
+};
+
 export const HOTEL_ROLE_OPTIONS = [
   { value: "", label: "None" },
   { value: "snacks_clerk", label: "Snacks Clerk" },

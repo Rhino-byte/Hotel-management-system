@@ -1,7 +1,13 @@
 import logging
 from contextlib import asynccontextmanager
 
-from db.connection import close_pool, init_pool, load_env_file
+from db.connection import (
+    close_pool,
+    close_transaction_pool,
+    init_pool,
+    init_transaction_pool,
+    load_env_file,
+)
 
 # Load .env before importing routers/security so JWT_SECRET and friends are set.
 load_env_file()
@@ -22,6 +28,7 @@ from app.routers import (
     inventory,
     snacks_drinks,
     stock_items,
+    tills,
 )
 
 logger = logging.getLogger("hotel_api")
@@ -32,7 +39,9 @@ validate_settings()
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
     init_pool()
+    init_transaction_pool()
     yield
+    close_transaction_pool()
     close_pool()
 
 
@@ -87,3 +96,4 @@ app.include_router(inventory.router, prefix="/api")
 app.include_router(admin.router, prefix="/api")
 app.include_router(analytics.router, prefix="/api")
 app.include_router(audit_sales.router, prefix="/api")
+app.include_router(tills.router, prefix="/api")

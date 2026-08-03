@@ -67,8 +67,20 @@ python scripts/introspect_neon.py
 
 ```env
 DATABASE_URL=postgresql://...?sslmode=require
+TRANSACTION_DATABASE_URL=postgresql://...?sslmode=require
+PHONE_NUMBER=0766106345
 JWT_SECRET=...
 CORS_ORIGINS=http://localhost:3000
 ```
 
 `DATABASE_URL` must be a raw PostgreSQL URL (not a `psql '...'` command).
+
+`TRANSACTION_DATABASE_URL` and `PHONE_NUMBER` power Admin → Tills (`transactions.phone_number`, `value_date`, `credit`). If unset, the hotel API still starts; tills endpoints return 503.
+
+### Keeping both Neons awake
+
+`GET /api/health/ready` runs `SELECT 1` on the hotel DB and, when `TRANSACTION_DATABASE_URL` is set, on the transactions DB. The Render cron (`HEALTH_PING_URL` → every 5 minutes) hits this endpoint so **both** projects stay warm on free tier.
+
+Connection pools use health checks, `max_idle`, and TCP keepalives to drop dead SSL sockets; that reduces intermittent errors but does **not** replace keep-warm after scale-to-zero.
+
+On paid Neon plans, for **both** projects (hotel + transactions), prefer disabling scale-to-zero or raising compute idle timeout so the cron is only a backup.
