@@ -6,12 +6,12 @@
 
 | Column | Type | Notes |
 |--------|------|-------|
-| `id` | integer (PK) | Shared with `employee.id` |
+| `id` | integer (PK) | **Same value as** `employee.id` (FK → `employee.id` via migration `010`) |
 | `pin` | integer | Numeric PIN |
 | `first_name` | varchar | Used with PIN for login |
 | `created_at` | timestamp | |
 
-Hotel login: **first_name + pin** (PIN alone is not unique).
+Hotel login: **first_name + pin** (PIN alone is not unique). Login joins `user_auth` to `employee` on `id`.
 
 ### `employee` — staff records
 
@@ -22,7 +22,7 @@ Hotel login: **first_name + pin** (PIN alone is not unique).
 | `role` | enum | Payroll: `STAFF`, `MANAGER`, `ADMIN` — **never modified by hotel app** |
 | `hotel_role` | enum (nullable) | Hotel: `snacks_clerk`, `food_clerk`, `stock_clerk`, `bar_clerk`, `admin` |
 
-Added by migration `002_employee_hotel_role.sql`.
+Added by migration `002_employee_hotel_role.sql`. FK from `user_auth.id` added by `010_user_auth_employee_fk.sql`.
 
 ## Effective hotel access
 
@@ -38,10 +38,20 @@ Added by migration `002_employee_hotel_role.sql`.
 
 ## Clerk onboarding
 
-Before a clerk can use the hotel app, assign `employee.hotel_role`:
+Order matters (employee before auth because of the FK):
 
-1. **UI:** Admin → Employees → select role → Save (see project [README](../../README.md#assigning-clerk-roles-required-before-login)).
-2. **Script:** `python scripts/seed_hotel_roles.py` with a first-name → role map.
+1. Create the row in **`employee`** (payroll).
+2. Create **`user_auth`** with the **same `id`**, `first_name`, and `pin`.
+3. Assign **`hotel_role`**: Admin → Employees → Save, or `python scripts/seed_hotel_roles.py`.
+
+If auth/employee ids drift, report/fix with:
+
+```bash
+python scripts/fix_auth_employee_orphans.py
+FIX_AUTH_PINS=8:1234 python scripts/fix_auth_employee_orphans.py --apply
+```
+
+Then apply migrations (including `010`). Admin → Employees shows **Login: Ready / Missing PIN**.
 
 Clerks see only their module tab plus **Audit** (scoped to their module). Payroll `ADMIN` users get full hotel admin without setting `hotel_role`.
 

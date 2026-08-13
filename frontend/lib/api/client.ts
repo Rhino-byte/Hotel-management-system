@@ -6,11 +6,9 @@ const API_BASE =
 
 const RETRY_DELAY_MS = 800;
 
-function formatApiError(
-  status: number,
-  body: { detail?: string | { msg?: string }[] },
-  target: string
-): string {
+type ApiErrorBody = { detail?: string | { msg?: string }[] };
+
+function formatApiError(status: number, body: ApiErrorBody, target: string): string {
   let detail: string | undefined;
   if (typeof body.detail === "string") {
     detail = body.detail;
@@ -38,6 +36,12 @@ function isNetworkError(err: unknown): boolean {
     msg.includes("load failed") ||
     msg.includes("fetch failed")
   );
+}
+
+type StatusError = Error & { status?: number; body?: ApiErrorBody };
+
+function requestTarget(path: string): string {
+  return `${API_BASE || (typeof window !== "undefined" ? window.location.origin : "")}${path}`;
 }
 
 export function getToken(): string | null {
@@ -81,14 +85,17 @@ async function apiFetchOnce<T>(path: string, options: RequestInit = {}): Promise
     throw new Error(detail || "Unauthorized");
   }
   if (res.status === 503) {
-    const err = new Error("Service Unavailable") as Error & { status?: number };
+    const body = (await res.json().catch(() => ({}))) as ApiErrorBody;
+    const err: StatusError = new Error(
+      formatApiError(503, body, requestTarget(path))
+    );
     err.status = 503;
+    err.body = body;
     throw err;
   }
   if (!res.ok) {
     const body = await res.json().catch(() => ({}));
-    const target = `${API_BASE || (typeof window !== "undefined" ? window.location.origin : "")}${path}`;
-    throw new Error(formatApiError(res.status, body, target));
+    throw new Error(formatApiError(res.status, body, requestTarget(path)));
   }
   return res.json() as Promise<T>;
 }
@@ -99,18 +106,15 @@ export async function apiFetch<T>(path: string, options: RequestInit = {}): Prom
   } catch (err) {
     const retryable =
       isNetworkError(err) ||
-      (err instanceof Error && (err as Error & { status?: number }).status === 503);
+      (err instanceof Error && (err as StatusError).status === 503);
     if (!retryable) throw err;
     await sleep(RETRY_DELAY_MS);
     try {
       return await apiFetchOnce<T>(path, options);
     } catch (retryErr) {
-      if (
-        retryErr instanceof Error &&
-        (retryErr as Error & { status?: number }).status === 503
-      ) {
-        const target = `${API_BASE || (typeof window !== "undefined" ? window.location.origin : "")}${path}`;
-        throw new Error(formatApiError(503, {}, target));
+      if (retryErr instanceof Error && (retryErr as StatusError).status === 503) {
+        const body = (retryErr as StatusError).body ?? {};
+        throw new Error(formatApiError(503, body, requestTarget(path)));
       }
       throw retryErr;
     }

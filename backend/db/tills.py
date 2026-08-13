@@ -46,6 +46,11 @@ def tills_report(date_from: date, date_to: date) -> dict[str, Any]:
             ).fetchall()
     except RuntimeError as exc:
         raise TillsConfigError(str(exc)) from exc
+    except Exception as exc:
+        raise TillsConfigError(
+            "Transactions database unavailable. "
+            "Check TRANSACTION_DATABASE_URL on the API host and Neon status."
+        ) from exc
 
     by_day = {row["day"]: float(row["total_credit"]) for row in rows}
 

@@ -63,8 +63,11 @@ def list_employees_with_hotel_roles() -> list[dict[str, Any]]:
                    e.first_name,
                    e.last_name,
                    e.role::text AS payroll_role,
-                   e.hotel_role::text AS hotel_role
+                   e.hotel_role::text AS hotel_role,
+                   (ua.id IS NOT NULL) AS has_user_auth,
+                   ua.first_name AS auth_first_name
             FROM employee e
+            LEFT JOIN user_auth ua ON ua.id = e.id
             ORDER BY e.first_name, e.last_name
             """
         ).fetchall()
@@ -72,6 +75,7 @@ def list_employees_with_hotel_roles() -> list[dict[str, Any]]:
         for row in rows:
             emp = dict(row)
             emp["display_name"] = f"{emp['first_name']} {emp['last_name']}".strip()
+            emp["has_user_auth"] = bool(emp.get("has_user_auth"))
             emp["effective_hotel_role"] = resolve_hotel_role(
                 emp["payroll_role"], emp.get("hotel_role")
             )

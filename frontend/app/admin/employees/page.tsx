@@ -47,6 +47,9 @@ export default function AdminEmployeesPage() {
   const filtered = employees.filter((emp) =>
     emp.display_name.toLowerCase().includes(query.trim().toLowerCase())
   );
+  const missingAuthWithRole = employees.filter(
+    (emp) => emp.hotel_role && emp.has_user_auth === false
+  );
 
   return (
     <main className="page">
@@ -56,12 +59,22 @@ export default function AdminEmployeesPage() {
           <div>
             <h1 className="page-title">Employee Hotel Roles</h1>
             <p className="page-subtitle">
-              Assign hotel app access per employee. Payroll ADMIN always has full hotel access.
+              Assign hotel app access per employee. Create{" "}
+              <code>user_auth</code> with the same <code>id</code> as{" "}
+              <code>employee</code> (and PIN) in payroll before clerks can sign in.
+              Payroll ADMIN always has full hotel access.
             </p>
           </div>
         </div>
         {error && <div className="alert error">{error}</div>}
         {message && <div className="alert success">{message}</div>}
+        {missingAuthWithRole.length > 0 && (
+          <div className="alert error">
+            {missingAuthWithRole.length} employee(s) have a hotel role but no login PIN
+            row: {missingAuthWithRole.map((e) => e.display_name).join(", ")}. Add{" "}
+            <code>user_auth</code> with matching <code>id</code> before they can log in.
+          </div>
+        )}
         <div className="filters">
           <label className="field">
             <span>Search employee</span>
@@ -82,6 +95,7 @@ export default function AdminEmployeesPage() {
               <tr>
                 <th>Name</th>
                 <th>Payroll role</th>
+                <th>Login</th>
                 <th>Hotel role</th>
                 <th>Effective access</th>
                 <th></th>
@@ -118,11 +132,30 @@ function EmployeeRoleRow({
   useEffect(() => setHotelRole(employee.hotel_role || ""), [employee.hotel_role]);
 
   const isPayrollAdmin = employee.payroll_role === "ADMIN";
+  const hasAuth = employee.has_user_auth !== false;
+  const nameMismatch =
+    hasAuth &&
+    employee.auth_first_name &&
+    employee.auth_first_name.toLowerCase() !== employee.first_name.toLowerCase();
 
   return (
-    <tr>
+    <tr className={!hasAuth && employee.hotel_role ? "bar-preview-row-warn" : undefined}>
       <td>{employee.display_name}</td>
       <td>{employee.payroll_role}</td>
+      <td>
+        {hasAuth ? (
+          <>
+            Ready
+            {nameMismatch ? (
+              <small style={{ display: "block", color: "#f59e0b" }}>
+                Auth name: {employee.auth_first_name} (login uses this)
+              </small>
+            ) : null}
+          </>
+        ) : (
+          "Missing PIN"
+        )}
+      </td>
       <td>
         <select
           className="input-cell"

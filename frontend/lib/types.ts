@@ -17,6 +17,8 @@ export type EmployeeRow = {
   payroll_role: string;
   hotel_role: string | null;
   effective_hotel_role: string | null;
+  has_user_auth?: boolean;
+  auth_first_name?: string | null;
 };
 
 export type ItemSubcategory = "snacks" | "drinks";

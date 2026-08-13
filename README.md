@@ -89,9 +89,23 @@ frontend/
 
 ## User roles
 
-Login uses **first name + PIN** from existing `user_auth` (payroll unchanged).
+Login uses **first name + PIN** from existing `user_auth` (payroll unchanged).  
+`user_auth.id` must equal `employee.id` (enforced by migration `010_user_auth_employee_fk.sql`).
 
 Hotel access is controlled by `employee.hotel_role`, except payroll `ADMIN` which gets full hotel access automatically.
+
+### Onboarding a new clerk
+
+1. Create the person in payroll **`employee`**.
+2. Create **`user_auth`** with the **same `id`**, login `first_name`, and `pin`.
+3. Assign a hotel role (below).
+
+If login fails after a role was assigned, check Admin → Employees **Login** column (`Ready` vs `Missing PIN`), or run:
+
+```bash
+cd backend
+python scripts/fix_auth_employee_orphans.py
+```
 
 ### Assigning clerk roles (required before login)
 
