@@ -11,7 +11,7 @@ CATEGORY_RULES: Final[dict[str, tuple[str, ...]]] = {
     "matumbo": ("matumbo",),
     "kuku": ("kuku",),
     "mix": ("mix", "beans", "minji", "matoke"),
-    "fries": ("fry", "fries", "beef"),
+    "fries": ("fry", "fries", "beef","nyama"),
     "managu": ("managu",),
 }
 

@@ -32,6 +32,19 @@ const COLORS = {
   plates: "#3d8bfd",
 };
 
+type TimeseriesGroup = "snacks" | "drinks" | "food" | "kuku";
+
+const TIMESERIES_GROUPS: { key: TimeseriesGroup; label: string }[] = [
+  { key: "snacks", label: "Snacks" },
+  { key: "drinks", label: "Drinks" },
+  { key: "food", label: "Food" },
+  { key: "kuku", label: "Kuku" },
+];
+
+const ALL_TIMESERIES_GROUPS = new Set<TimeseriesGroup>(
+  TIMESERIES_GROUPS.map((g) => g.key)
+);
+
 function formatNumber(value: number): string {
   return Number(value).toLocaleString(undefined, { maximumFractionDigits: 2 });
 }
@@ -104,6 +117,22 @@ export default function AdminAuditPage() {
   const [activeCategory, setActiveCategory] = useState<SalesAuditCategoryKey | null>(null);
   const [reportLoading, setReportLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [visibleGroups, setVisibleGroups] = useState<Set<TimeseriesGroup>>(
+    () => new Set(ALL_TIMESERIES_GROUPS)
+  );
+
+  const toggleGroup = (key: TimeseriesGroup) => {
+    setVisibleGroups((current) => {
+      const next = new Set(current);
+      if (next.has(key)) {
+        if (next.size === 1) return current;
+        next.delete(key);
+      } else {
+        next.add(key);
+      }
+      return next;
+    });
+  };
 
   const loadReport = useCallback(async () => {
     if (dateFrom > dateTo) {
@@ -367,7 +396,8 @@ export default function AdminAuditPage() {
                 <div>
                   <h2 className="analytics-section-title">Total sales over time</h2>
                   <p className="analytics-meta">
-                    Daily revenue for Snacks, Drinks, Food and Kuku. Bar sales are not
+                    Daily revenue for Snacks, Drinks, Food and Kuku. Hide a group to
+                    compare lines; Total stays the full day amount. Bar sales are not
                     included.
                   </p>
                 </div>
@@ -378,6 +408,31 @@ export default function AdminAuditPage() {
                 >
                   Download daily sales CSV
                 </button>
+              </div>
+              <div
+                className="bar-preview-tabs"
+                aria-label="Show or hide sales groups"
+              >
+                {TIMESERIES_GROUPS.map((group) => (
+                  <button
+                    key={group.key}
+                    type="button"
+                    className={
+                      visibleGroups.has(group.key)
+                        ? "bar-preview-tab active"
+                        : "bar-preview-tab"
+                    }
+                    aria-pressed={visibleGroups.has(group.key)}
+                    onClick={() => toggleGroup(group.key)}
+                    style={{
+                      borderColor: visibleGroups.has(group.key)
+                        ? COLORS[group.key]
+                        : undefined,
+                    }}
+                  >
+                    {group.label}
+                  </button>
+                ))}
               </div>
               <div className="analytics-chart sales-audit-line-chart">
                 <ResponsiveContainer width="100%" height="100%">
@@ -408,33 +463,22 @@ export default function AdminAuditPage() {
                       ]}
                     />
                     <Legend />
-                    <Line
-                      type="monotone"
-                      dataKey="snacks"
-                      stroke={COLORS.snacks}
-                      strokeWidth={2}
-                    />
-                    <Line
-                      type="monotone"
-                      dataKey="drinks"
-                      stroke={COLORS.drinks}
-                      strokeWidth={2}
-                    />
-                    <Line
-                      type="monotone"
-                      dataKey="food"
-                      stroke={COLORS.food}
-                      strokeWidth={2}
-                    />
-                    <Line
-                      type="monotone"
-                      dataKey="kuku"
-                      stroke={COLORS.kuku}
-                      strokeWidth={2}
-                    />
+                    {TIMESERIES_GROUPS.filter((group) =>
+                      visibleGroups.has(group.key)
+                    ).map((group) => (
+                      <Line
+                        key={group.key}
+                        type="monotone"
+                        dataKey={group.key}
+                        name={group.label}
+                        stroke={COLORS[group.key]}
+                        strokeWidth={2}
+                      />
+                    ))}
                     <Line
                       type="monotone"
                       dataKey="total"
+                      name="Total"
                       stroke={COLORS.total}
                       strokeWidth={3}
                     />
