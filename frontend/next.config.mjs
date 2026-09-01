@@ -3,6 +3,16 @@ const apiBase = (process.env.NEXT_PUBLIC_API_BASE || "http://localhost:8000").re
 
 const nextConfig = {
   reactStrictMode: true,
+  webpack: (config) => {
+    config.resolve.fallback = {
+      ...config.resolve.fallback,
+      fs: false,
+      path: false,
+      stream: false,
+      crypto: false,
+    };
+    return config;
+  },
   async rewrites() {
     return [
       {

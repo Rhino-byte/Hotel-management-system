@@ -153,10 +153,15 @@ export type SalesAuditFoodPlateRow = {
   revenue: number;
 };
 
+export type SalesAuditCategoryDay = {
+  entry_date: string;
+} & Record<SalesAuditCategoryKey, number>;
+
 export type SalesAuditReport = {
   date_from: string;
   date_to: string;
   categories: SalesAuditCategory[];
+  category_daily: SalesAuditCategoryDay[];
   food_plates: SalesAuditFoodPlateRow[];
   chapati: {
     cooked: number;

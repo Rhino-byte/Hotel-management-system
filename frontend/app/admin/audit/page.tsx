@@ -17,10 +17,8 @@ import LoadingScreen from "../../../components/LoadingScreen";
 import { fetchSalesAudit, todayIso } from "../../../lib/api";
 import { useRequireAuth } from "../../../lib/auth";
 import type {
-  SalesAuditCategory,
   SalesAuditCategoryKey,
   SalesAuditDay,
-  SalesAuditFoodPlateRow,
   SalesAuditReport,
   SalesAuditSnackRow,
 } from "../../../lib/types";
@@ -46,6 +44,16 @@ const TIMESERIES_GROUPS: { key: TimeseriesGroup; label: string }[] = [
 const ALL_TIMESERIES_GROUPS = new Set<TimeseriesGroup>(
   TIMESERIES_GROUPS.map((g) => g.key)
 );
+
+const CATEGORY_COLUMNS: { key: SalesAuditCategoryKey; label: string }[] = [
+  { key: "ugali", label: "Ugali" },
+  { key: "rice", label: "Rice" },
+  { key: "matumbo", label: "Matumbo" },
+  { key: "kuku", label: "Kuku" },
+  { key: "mix", label: "Mix" },
+  { key: "fries", label: "Fries" },
+  { key: "managu", label: "Managu" },
+];
 
 function formatNumber(value: number): string {
   return Number(value).toLocaleString(undefined, { maximumFractionDigits: 2 });
@@ -99,30 +107,6 @@ function dailySalesCsv(rows: SalesAuditDay[]): string {
   return lines.join("\n");
 }
 
-function platesCategoriesCsv(categories: SalesAuditCategory[]): string {
-  const header = ["category_key", "category_label", "plates", "revenue"];
-  const lines = [
-    header.join(","),
-    ...categories.map((cat) =>
-      [cat.key, cat.label, cat.plates, cat.revenue].map(csvEscape).join(",")
-    ),
-  ];
-  return lines.join("\n");
-}
-
-function platesDishesCsv(rows: SalesAuditFoodPlateRow[]): string {
-  const header = ["entry_date", "item_id", "item_name", "plates", "revenue"];
-  const lines = [
-    header.join(","),
-    ...rows.map((row) =>
-      [row.entry_date, row.item_id, row.item_name, row.plates, row.revenue]
-        .map(csvEscape)
-        .join(",")
-    ),
-  ];
-  return lines.join("\n");
-}
-
 function snacksDrinksAddedCsv(rows: SalesAuditSnackRow[]): string {
   const header = ["item_id", "item_name", "entry_date", "added", "sold", "revenue"];
   const lines = [
@@ -136,8 +120,7 @@ function snacksDrinksAddedCsv(rows: SalesAuditSnackRow[]): string {
   return lines.join("\n");
 }
 
-function downloadTextFile(filename: string, content: string, mime = "text/csv;charset=utf-8") {
-  const blob = new Blob([content], { type: mime });
+function downloadBlob(filename: string, blob: Blob) {
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
   link.href = url;
@@ -146,6 +129,47 @@ function downloadTextFile(filename: string, content: string, mime = "text/csv;ch
   link.click();
   link.remove();
   URL.revokeObjectURL(url);
+}
+
+function downloadTextFile(filename: string, content: string, mime = "text/csv;charset=utf-8") {
+  downloadBlob(filename, new Blob([content], { type: mime }));
+}
+
+async function buildPlatesWorkbook(report: SalesAuditReport) {
+  const ExcelJSMod = await import("exceljs");
+  const ExcelJS = ExcelJSMod.default ?? ExcelJSMod;
+  const workbook = new ExcelJS.Workbook();
+
+  const categoriesSheet = workbook.addWorksheet("Categories");
+  categoriesSheet.columns = [
+    { header: "entry_date", key: "entry_date", width: 14 },
+    ...CATEGORY_COLUMNS.map((column) => ({
+      header: column.label,
+      key: column.key,
+      width: 12,
+    })),
+  ];
+  for (const row of report.category_daily ?? []) {
+    const values: Record<string, string | number> = { entry_date: row.entry_date };
+    for (const column of CATEGORY_COLUMNS) {
+      values[column.key] = row[column.key] ?? 0;
+    }
+    categoriesSheet.addRow(values);
+  }
+
+  const dishesSheet = workbook.addWorksheet("Dishes");
+  dishesSheet.columns = [
+    { header: "entry_date", key: "entry_date", width: 14 },
+    { header: "item_id", key: "item_id", width: 10 },
+    { header: "item_name", key: "item_name", width: 28 },
+    { header: "plates", key: "plates", width: 10 },
+    { header: "revenue", key: "revenue", width: 12 },
+  ];
+  for (const row of report.food_plates ?? []) {
+    dishesSheet.addRow(row);
+  }
+
+  return workbook.xlsx.writeBuffer();
 }
 
 export default function AdminAuditPage() {
@@ -159,7 +183,6 @@ export default function AdminAuditPage() {
   const [visibleGroups, setVisibleGroups] = useState<Set<TimeseriesGroup>>(
     () => new Set(ALL_TIMESERIES_GROUPS)
   );
-  const [dishExportDate, setDishExportDate] = useState(todayIso());
 
   const toggleGroup = (key: TimeseriesGroup) => {
     setVisibleGroups((current) => {
@@ -185,7 +208,6 @@ export default function AdminAuditPage() {
       const result = await fetchSalesAudit(dateFrom, dateTo);
       setReport(result);
       setActiveCategory(null);
-      setDishExportDate(dateTo);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load sales audit");
     } finally {
@@ -239,20 +261,19 @@ export default function AdminAuditPage() {
     );
   };
 
-  const downloadPlatesCategoriesCsv = () => {
+  const downloadPlatesExcel = async () => {
     if (!report) return;
-    downloadTextFile(
-      `plates-categories-${report.date_from}-to-${report.date_to}.csv`,
-      platesCategoriesCsv(report.categories)
-    );
-  };
-
-  const downloadPlatesDishesCsv = () => {
-    if (!report) return;
-    const day =
-      report.date_from === report.date_to ? report.date_from : dishExportDate;
-    const rows = (report.food_plates ?? []).filter((row) => row.entry_date === day);
-    downloadTextFile(`plates-dishes-${day}.csv`, platesDishesCsv(rows));
+    try {
+      const buffer = await buildPlatesWorkbook(report);
+      downloadBlob(
+        `plates-${report.date_from}-to-${report.date_to}.xlsx`,
+        new Blob([buffer as ArrayBuffer], {
+          type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        })
+      );
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to build plates Excel");
+    }
   };
 
   const downloadSnacksAddedCsv = () => {
@@ -270,9 +291,6 @@ export default function AdminAuditPage() {
       snacksDrinksAddedCsv(report.drinks_added)
     );
   };
-
-  const showDishDatePicker =
-    report != null && report.date_from !== report.date_to;
 
   return (
     <main className="page">
@@ -361,34 +379,13 @@ export default function AdminAuditPage() {
                       : `${report.date_from} → ${report.date_to}`}
                   </p>
                 </div>
-                <div className="audit-preset-group">
-                  <button
-                    type="button"
-                    className="btn btn-secondary btn-sm"
-                    onClick={downloadPlatesCategoriesCsv}
-                  >
-                    Categories CSV
-                  </button>
-                  {showDishDatePicker && (
-                    <label className="field">
-                      <span>Dish date</span>
-                      <input
-                        type="date"
-                        value={dishExportDate}
-                        min={report.date_from}
-                        max={report.date_to}
-                        onChange={(e) => setDishExportDate(e.target.value)}
-                      />
-                    </label>
-                  )}
-                  <button
-                    type="button"
-                    className="btn btn-secondary btn-sm"
-                    onClick={downloadPlatesDishesCsv}
-                  >
-                    Dishes CSV
-                  </button>
-                </div>
+                <button
+                  type="button"
+                  className="btn btn-secondary btn-sm"
+                  onClick={downloadPlatesExcel}
+                >
+                  Plates Excel
+                </button>
               </div>
               <div className="sales-audit-grid">
                 {report.categories.map((category) => (

@@ -100,6 +100,7 @@ def sales_report(date_from: date, date_to: date) -> dict[str, Any]:
         }
         for key in CATEGORY_RULES
     }
+    date_keys = _date_keys(date_from, date_to)
     timeseries = {
         day: {
             "entry_date": day,
@@ -109,7 +110,10 @@ def sales_report(date_from: date, date_to: date) -> dict[str, Any]:
             "kuku": 0.0,
             "total": 0.0,
         }
-        for day in _date_keys(date_from, date_to)
+        for day in date_keys
+    }
+    category_daily = {
+        day: {key: 0.0 for key in CATEGORY_RULES} for day in date_keys
     }
 
     chapati_dish_plates = 0.0
@@ -138,6 +142,7 @@ def sales_report(date_from: date, date_to: date) -> dict[str, Any]:
             chapati_dish_plates += quantity
 
         for category_key in classify(item_name):
+            category_daily[entry_date][category_key] += quantity
             category = category_totals[category_key]
             category["plates"] += quantity
             category["revenue"] += revenue
@@ -244,6 +249,9 @@ def sales_report(date_from: date, date_to: date) -> dict[str, Any]:
         "date_from": str(date_from),
         "date_to": str(date_to),
         "categories": category_results,
+        "category_daily": [
+            {"entry_date": day, **counts} for day, counts in category_daily.items()
+        ],
         "food_plates": food_plates,
         "chapati": {
             "cooked": chapati_cooked,
