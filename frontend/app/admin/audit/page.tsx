@@ -17,8 +17,10 @@ import LoadingScreen from "../../../components/LoadingScreen";
 import { fetchSalesAudit, todayIso } from "../../../lib/api";
 import { useRequireAuth } from "../../../lib/auth";
 import type {
+  SalesAuditCategory,
   SalesAuditCategoryKey,
   SalesAuditDay,
+  SalesAuditFoodPlateRow,
   SalesAuditReport,
   SalesAuditSnackRow,
 } from "../../../lib/types";
@@ -97,6 +99,43 @@ function dailySalesCsv(rows: SalesAuditDay[]): string {
   return lines.join("\n");
 }
 
+function platesCategoriesCsv(categories: SalesAuditCategory[]): string {
+  const header = ["category_key", "category_label", "plates", "revenue"];
+  const lines = [
+    header.join(","),
+    ...categories.map((cat) =>
+      [cat.key, cat.label, cat.plates, cat.revenue].map(csvEscape).join(",")
+    ),
+  ];
+  return lines.join("\n");
+}
+
+function platesDishesCsv(rows: SalesAuditFoodPlateRow[]): string {
+  const header = ["entry_date", "item_id", "item_name", "plates", "revenue"];
+  const lines = [
+    header.join(","),
+    ...rows.map((row) =>
+      [row.entry_date, row.item_id, row.item_name, row.plates, row.revenue]
+        .map(csvEscape)
+        .join(",")
+    ),
+  ];
+  return lines.join("\n");
+}
+
+function snacksDrinksAddedCsv(rows: SalesAuditSnackRow[]): string {
+  const header = ["item_id", "item_name", "entry_date", "added", "sold", "revenue"];
+  const lines = [
+    header.join(","),
+    ...rows.map((row) =>
+      [row.item_id, row.item_name, row.entry_date, row.added, row.sold, row.revenue]
+        .map(csvEscape)
+        .join(",")
+    ),
+  ];
+  return lines.join("\n");
+}
+
 function downloadTextFile(filename: string, content: string, mime = "text/csv;charset=utf-8") {
   const blob = new Blob([content], { type: mime });
   const url = URL.createObjectURL(blob);
@@ -120,6 +159,7 @@ export default function AdminAuditPage() {
   const [visibleGroups, setVisibleGroups] = useState<Set<TimeseriesGroup>>(
     () => new Set(ALL_TIMESERIES_GROUPS)
   );
+  const [dishExportDate, setDishExportDate] = useState(todayIso());
 
   const toggleGroup = (key: TimeseriesGroup) => {
     setVisibleGroups((current) => {
@@ -145,6 +185,7 @@ export default function AdminAuditPage() {
       const result = await fetchSalesAudit(dateFrom, dateTo);
       setReport(result);
       setActiveCategory(null);
+      setDishExportDate(dateTo);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load sales audit");
     } finally {
@@ -197,6 +238,41 @@ export default function AdminAuditPage() {
       csv
     );
   };
+
+  const downloadPlatesCategoriesCsv = () => {
+    if (!report) return;
+    downloadTextFile(
+      `plates-categories-${report.date_from}-to-${report.date_to}.csv`,
+      platesCategoriesCsv(report.categories)
+    );
+  };
+
+  const downloadPlatesDishesCsv = () => {
+    if (!report) return;
+    const day =
+      report.date_from === report.date_to ? report.date_from : dishExportDate;
+    const rows = (report.food_plates ?? []).filter((row) => row.entry_date === day);
+    downloadTextFile(`plates-dishes-${day}.csv`, platesDishesCsv(rows));
+  };
+
+  const downloadSnacksAddedCsv = () => {
+    if (!report) return;
+    downloadTextFile(
+      `snacks-added-${report.date_from}-to-${report.date_to}.csv`,
+      snacksDrinksAddedCsv(report.snacks_added)
+    );
+  };
+
+  const downloadDrinksAddedCsv = () => {
+    if (!report) return;
+    downloadTextFile(
+      `drinks-added-${report.date_from}-to-${report.date_to}.csv`,
+      snacksDrinksAddedCsv(report.drinks_added)
+    );
+  };
+
+  const showDishDatePicker =
+    report != null && report.date_from !== report.date_to;
 
   return (
     <main className="page">
@@ -284,6 +360,34 @@ export default function AdminAuditPage() {
                       ? report.date_from
                       : `${report.date_from} → ${report.date_to}`}
                   </p>
+                </div>
+                <div className="audit-preset-group">
+                  <button
+                    type="button"
+                    className="btn btn-secondary btn-sm"
+                    onClick={downloadPlatesCategoriesCsv}
+                  >
+                    Categories CSV
+                  </button>
+                  {showDishDatePicker && (
+                    <label className="field">
+                      <span>Dish date</span>
+                      <input
+                        type="date"
+                        value={dishExportDate}
+                        min={report.date_from}
+                        max={report.date_to}
+                        onChange={(e) => setDishExportDate(e.target.value)}
+                      />
+                    </label>
+                  )}
+                  <button
+                    type="button"
+                    className="btn btn-secondary btn-sm"
+                    onClick={downloadPlatesDishesCsv}
+                  >
+                    Dishes CSV
+                  </button>
                 </div>
               </div>
               <div className="sales-audit-grid">
@@ -531,11 +635,21 @@ export default function AdminAuditPage() {
 
             <section className="analytics-section">
               <div className="analytics-section-head">
-                <h2 className="analytics-section-title">Snacks added</h2>
+                <div>
+                  <h2 className="analytics-section-title">Snacks added</h2>
+                  <p className="analytics-meta">
+                    Snack stock additions during the selected range, with range totals per
+                    item.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  className="btn btn-secondary btn-sm"
+                  onClick={downloadSnacksAddedCsv}
+                >
+                  Download CSV
+                </button>
               </div>
-              <p className="analytics-meta">
-                Snack stock additions during the selected range, with range totals per item.
-              </p>
               {snackGroups.length === 0 ? (
                 <p className="empty-state">No snacks were added in this range.</p>
               ) : (
@@ -585,11 +699,21 @@ export default function AdminAuditPage() {
 
             <section className="analytics-section">
               <div className="analytics-section-head">
-                <h2 className="analytics-section-title">Drinks added</h2>
+                <div>
+                  <h2 className="analytics-section-title">Drinks added</h2>
+                  <p className="analytics-meta">
+                    Drink stock additions during the selected range, with range totals per
+                    item.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  className="btn btn-secondary btn-sm"
+                  onClick={downloadDrinksAddedCsv}
+                >
+                  Download CSV
+                </button>
               </div>
-              <p className="analytics-meta">
-                Drink stock additions during the selected range, with range totals per item.
-              </p>
               {drinkGroups.length === 0 ? (
                 <p className="empty-state">No drinks were added in this range.</p>
               ) : (

@@ -145,10 +145,19 @@ export type SalesAuditDay = {
   total: number;
 };
 
+export type SalesAuditFoodPlateRow = {
+  entry_date: string;
+  item_id: number;
+  item_name: string;
+  plates: number;
+  revenue: number;
+};
+
 export type SalesAuditReport = {
   date_from: string;
   date_to: string;
   categories: SalesAuditCategory[];
+  food_plates: SalesAuditFoodPlateRow[];
   chapati: {
     cooked: number;
     dish_plates: number;

@@ -113,12 +113,23 @@ def sales_report(date_from: date, date_to: date) -> dict[str, Any]:
     }
 
     chapati_dish_plates = 0.0
+    food_plates: list[dict[str, Any]] = []
     for row in food_rows:
         item_id = int(row["item_id"])
         item_name = str(row["item_name"])
         entry_date = str(row["entry_date"])
         quantity = float(row["quantity"] or 0)
         revenue = quantity * float(row["price_ksh"] or 0)
+
+        food_plates.append(
+            {
+                "entry_date": entry_date,
+                "item_id": item_id,
+                "item_name": item_name,
+                "plates": quantity,
+                "revenue": revenue,
+            }
+        )
 
         chart_group = "kuku" if "kuku" in item_name.casefold() else "food"
         timeseries[entry_date][chart_group] += revenue
@@ -233,6 +244,7 @@ def sales_report(date_from: date, date_to: date) -> dict[str, Any]:
         "date_from": str(date_from),
         "date_to": str(date_to),
         "categories": category_results,
+        "food_plates": food_plates,
         "chapati": {
             "cooked": chapati_cooked,
             "dish_plates": chapati_dish_plates,
