@@ -9,6 +9,7 @@ from psycopg_pool import ConnectionPool
 
 _pool: Optional[ConnectionPool] = None
 _transaction_pool: Optional[ConnectionPool] = None
+_store_pool: Optional[ConnectionPool] = None
 _env_loaded = False
 
 
@@ -40,6 +41,15 @@ def get_transaction_database_url() -> Optional[str]:
     """Return TRANSACTION_DATABASE_URL if configured, else None."""
     load_env_file()
     url = os.getenv("TRANSACTION_DATABASE_URL", "").strip()
+    if not url:
+        return None
+    return normalize_database_url(url)
+
+
+def get_store_database_url() -> Optional[str]:
+    """Return STORE_DATABASE_URL if configured, else None."""
+    load_env_file()
+    url = os.getenv("STORE_DATABASE_URL", "").strip()
     if not url:
         return None
     return normalize_database_url(url)
@@ -126,6 +136,31 @@ def close_transaction_pool() -> None:
         _transaction_pool = None
 
 
+def init_store_pool(min_size: int = 1, max_size: int = 5) -> None:
+    """Init optional pool for STORE_DATABASE_URL. No-op if unset."""
+    global _store_pool
+    if _store_pool is not None:
+        return
+    url = get_store_database_url()
+    if not url:
+        return
+    _store_pool = ConnectionPool(
+        conninfo=url,
+        min_size=min_size,
+        max_size=max_size,
+        max_idle=300,
+        check=ConnectionPool.check_connection,
+        kwargs=_pool_kwargs(),
+    )
+
+
+def close_store_pool() -> None:
+    global _store_pool
+    if _store_pool is not None:
+        _store_pool.close()
+        _store_pool = None
+
+
 def get_pool() -> ConnectionPool:
     if _pool is None:
         init_pool()
@@ -139,6 +174,12 @@ def get_transaction_pool() -> Optional[ConnectionPool]:
     return _transaction_pool
 
 
+def get_store_pool() -> Optional[ConnectionPool]:
+    if _store_pool is None:
+        init_store_pool()
+    return _store_pool
+
+
 @contextmanager
 def get_conn() -> Generator[psycopg.Connection, None, None]:
     with get_pool().connection() as conn:
@@ -150,5 +191,14 @@ def get_transaction_conn() -> Generator[psycopg.Connection, None, None]:
     pool = get_transaction_pool()
     if pool is None:
         raise RuntimeError("TRANSACTION_DATABASE_URL is not set")
+    with pool.connection() as conn:
+        yield conn
+
+
+@contextmanager
+def get_store_conn() -> Generator[psycopg.Connection, None, None]:
+    pool = get_store_pool()
+    if pool is None:
+        raise RuntimeError("STORE_DATABASE_URL is not set")
     with pool.connection() as conn:
         yield conn

@@ -78,6 +78,9 @@ python scripts/introspect_neon.py
 ```env
 DATABASE_URL=postgresql://...?sslmode=require
 TRANSACTION_DATABASE_URL=postgresql://...?sslmode=require
+GOOGLE_SHEETS_SPREADSHEET_ID=...
+GOOGLE_SERVICE_ACCOUNT_JSON={"type":"service_account",...}
+GOOGLE_SERVICE_ACCOUNT_EMAIL=name@project.iam.gserviceaccount.com
 PHONE_NUMBER=0766106345
 JWT_SECRET=...
 CORS_ORIGINS=http://localhost:3000
@@ -87,10 +90,12 @@ CORS_ORIGINS=http://localhost:3000
 
 `TRANSACTION_DATABASE_URL` and `PHONE_NUMBER` power Admin → Tills (`transactions.phone_number`, `value_date`, `credit`). If unset, the hotel API still starts; tills endpoints return 503.
 
-### Keeping both Neons awake
+`GOOGLE_SHEETS_SPREADSHEET_ID` and `GOOGLE_SERVICE_ACCOUNT_JSON` power Admin → Cost & profit. The JSON value can be the full key file, or only the private key when `GOOGLE_SERVICE_ACCOUNT_EMAIL` is set. The hotel API reads the sheet tabs `Transactions` and `Sheet1`. If unset, the report still returns hotel sales and marks store-based cost as waiting.
 
-`GET /api/health/ready` runs `SELECT 1` on the hotel DB and, when `TRANSACTION_DATABASE_URL` is set, on the transactions DB. The Render cron (`HEALTH_PING_URL` → every 5 minutes) hits this endpoint so **both** projects stay warm on free tier.
+### Keeping the Neons awake
+
+`GET /api/health/ready` runs `SELECT 1` on the hotel DB and, when configured, on the transactions DB. It also reads one cell of the store sheet when that env is set. The Render cron (`HEALTH_PING_URL` → every 5 minutes) hits this endpoint so the Neon projects stay warm on free tier.
 
 Connection pools use health checks, `max_idle`, and TCP keepalives to drop dead SSL sockets; that reduces intermittent errors but does **not** replace keep-warm after scale-to-zero.
 
-On paid Neon plans, for **both** projects (hotel + transactions), prefer disabling scale-to-zero or raising compute idle timeout so the cron is only a backup.
+On paid Neon plans, for the hotel and transactions projects, prefer disabling scale-to-zero or raising compute idle timeout so the cron is only a backup.

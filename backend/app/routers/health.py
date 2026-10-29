@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Response, status
 
 from db.connection import get_conn, get_transaction_conn, get_transaction_database_url
+from db.store import ping_sheet
 
 router = APIRouter(tags=["health"])
 
@@ -12,7 +13,7 @@ def health():
 
 @router.get("/health/ready")
 def health_ready(response: Response):
-    """Ping hotel DB and, when configured, transactions DB (keeps both Neons warm)."""
+    """Ping hotel DB, the transactions DB, and the store sheet when configured."""
     database = "ok"
     try:
         with get_conn() as conn:
@@ -30,15 +31,19 @@ def health_ready(response: Response):
         except Exception:
             transactions = "error"
 
-    if database == "error" or transactions == "error":
+    store = ping_sheet()
+
+    if database == "error" or transactions == "error" or store == "error":
         response.status_code = status.HTTP_503_SERVICE_UNAVAILABLE
         return {
             "status": "unavailable",
             "database": database,
             "transactions": transactions,
+            "store": store,
         }
     return {
         "status": "ok",
         "database": database,
         "transactions": transactions,
+        "store": store,
     }

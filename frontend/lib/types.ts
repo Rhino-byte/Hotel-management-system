@@ -210,6 +210,86 @@ export type TillsReport = {
   timeseries: TillsDay[];
 };
 
+export type CostCategory = "snacks" | "drinks" | "food" | "kuku";
+
+export type CostDataSource =
+  | "hotel_sold"
+  | "store_stock_out"
+  | "recipe_milk"
+  | "policy_rate";
+
+export type CostSetting = {
+  id: number;
+  name: string;
+  category: CostCategory;
+  data_source: CostDataSource;
+  purchase_price: number;
+  hotel_item_name: string | null;
+  store_item_name: string | null;
+  tea_cups_per_liter: number | null;
+  white_coffee_cups_per_liter: number | null;
+  bags_per_week: number | null;
+  cylinder_cost_per_month: number | null;
+  display_order: number;
+  updated_at?: string;
+};
+
+export type CostSettingsResponse = {
+  settings: CostSetting[];
+  hotel_items: string[];
+  store_items: string[];
+};
+
+export type CostReportStatus = "final" | "preliminary";
+export type CostStoreStatus = "ok" | "unconfigured" | "unavailable";
+export type CostLineStatus = "ready" | "waiting";
+
+export type CostReportGroup = {
+  key: CostCategory;
+  label: string;
+  revenue: number;
+  cost: number;
+  profit: number;
+  cost_complete: boolean;
+};
+
+export type CostReportDay = {
+  day: string;
+  revenue: number;
+  cost: number;
+};
+
+export type CostReportLine = {
+  id: number;
+  name: string;
+  category: CostCategory;
+  data_source: CostDataSource;
+  quantity: number | null;
+  purchase_price: number;
+  cost: number | null;
+  status: CostLineStatus;
+  other_destinations: Record<string, number>;
+  correction_in: number;
+};
+
+export type CostReportCheck = {
+  kind: "water" | "makaa" | "gas" | "duplicate";
+  ok: boolean;
+  message: string;
+};
+
+export type CostReport = {
+  date_from: string;
+  date_to: string;
+  status: CostReportStatus;
+  store_status: CostStoreStatus;
+  note: string | null;
+  groups: CostReportGroup[];
+  days: CostReportDay[];
+  lines: CostReportLine[];
+  checks: CostReportCheck[];
+};
+
 export const HOTEL_ROLE_OPTIONS = [
   { value: "", label: "None" },
   { value: "snacks_clerk", label: "Snacks Clerk" },

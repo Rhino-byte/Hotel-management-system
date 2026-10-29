@@ -3,7 +3,13 @@ export { login, fetchMe } from "./auth";
 export { fetchSnacksDrinks, saveSnacksDrinks } from "./snacks-drinks";
 export { fetchBar, saveBar } from "./bar";
 export { fetchFoodKuku, saveFoodKuku, addFoodDish } from "./food-kuku";
-export { fetchStockItems, saveStockItems } from "./stock-items";
+export {
+  fetchStockItems,
+  saveStockItems,
+  fetchCostSettings,
+  createCostSetting,
+  updateCostSetting,
+} from "./stock-items";
 export {
   fetchPrices,
   updatePrice,
@@ -18,3 +24,4 @@ export {
 } from "./admin";
 export { fetchSalesTotals, fetchDaySalesTotals, fetchItemsSold } from "./analytics";
 export { fetchTillsReport } from "./tills";
+export { fetchCostReport } from "./cost-report";

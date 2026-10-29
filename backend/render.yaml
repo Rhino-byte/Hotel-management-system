@@ -10,6 +10,12 @@ services:
         sync: false
       - key: TRANSACTION_DATABASE_URL
         sync: false
+      - key: GOOGLE_SHEETS_SPREADSHEET_ID
+        sync: false
+      - key: GOOGLE_SERVICE_ACCOUNT_JSON
+        sync: false
+      - key: GOOGLE_SERVICE_ACCOUNT_EMAIL
+        sync: false
       - key: PHONE_NUMBER
         sync: false
       - key: JWT_SECRET
@@ -20,7 +26,7 @@ services:
         value: production
 
   # Keeps Neon from suspending: hits /api/health/ready every 5 minutes
-  # (hotel DB + transactions DB when TRANSACTION_DATABASE_URL is set).
+  # (hotel DB and transactions DB; the store sheet is checked when configured).
   - type: cron
     name: hotel-api-keepwarm
     rootDir: backend

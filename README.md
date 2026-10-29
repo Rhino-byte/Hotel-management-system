@@ -20,7 +20,7 @@ Hotel-management-system/
 |--------|------|----------------|
 | Snacks & Drinks | `snacks_clerk`, `admin` | Closing stock + added stock per item/day |
 | Food & Kuku | `food_clerk`, `admin` | Quantity sold per dish/day |
-| Stock Items | `stock_clerk`, `admin` | Raw material closing + added stock |
+| Stock Items | `stock_clerk`, `admin` | Cost settings: category, data source, purchase price. Clerks can read; admins edit |
 | Bar Stock | `bar_clerk`, `admin` | Opening (carried), add, B.B.F closing; same-day sales |
 | Admin | `admin` | Prices, stock catalog, audit views |
 
@@ -116,7 +116,7 @@ Employees without a hotel role (and who are not payroll `ADMIN`) cannot log in. 
 3. Search for the employee and choose a **Hotel role** from the dropdown:
    - **Snacks Clerk** → Snacks & Drinks daily entry only
    - **Food Clerk** → Food & Kuku daily entry only
-   - **Stock Clerk** → Stock Items daily entry only
+   - **Stock Clerk** → Stock Items cost settings (read only)
    - **Hotel Admin** → full access (prices, catalog, employees, audit)
 4. Click **Save** on that row.
 

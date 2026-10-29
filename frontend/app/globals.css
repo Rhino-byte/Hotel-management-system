@@ -527,6 +527,21 @@ h2 {
   background: #172a4d;
 }
 
+.rate-fields {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  min-width: 150px;
+}
+
+.rate-fields label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  font-size: 0.72rem;
+  color: var(--text-soft);
+}
+
 .inline-field-row {
   display: flex;
   align-items: center;
@@ -817,6 +832,21 @@ h2 {
 
 .analytics-units-cell strong {
   font-size: 0.95rem;
+}
+
+button.analytics-units-cell {
+  appearance: none;
+  width: 100%;
+  margin: 0;
+  text-align: left;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+
+button.analytics-units-cell.selected {
+  border-color: #3d8bfd;
+  box-shadow: inset 0 0 0 1px #3d8bfd;
 }
 
 @media (max-width: 720px) {
@@ -1124,6 +1154,108 @@ h2 {
     align-items: flex-start;
     gap: 0.35rem;
   }
+}
+
+.cost-check-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem 1.15rem;
+  margin: 0 0 0.85rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.cost-check-count.matched {
+  color: #86efac;
+}
+
+.cost-check-count.off,
+.cost-check-count.waiting {
+  color: #f59e0b;
+}
+
+.cost-check-group-title {
+  margin: 0.95rem 0 0.45rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #8b9bb8;
+}
+
+.cost-check-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.cost-check {
+  display: grid;
+  grid-template-columns: 6.25rem minmax(0, 1fr) auto;
+  align-items: start;
+  gap: 0.75rem;
+  padding: 0.65rem 0.85rem;
+  border-radius: var(--radius-sm);
+  border: 1px solid #1f2a44;
+  border-left-width: 3px;
+  background: #0f1b33;
+}
+
+.cost-check.matched {
+  border-left-color: #86efac;
+}
+
+.cost-check.off,
+.cost-check.waiting {
+  border-left-color: #f59e0b;
+}
+
+.cost-check-kind {
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text);
+}
+
+.cost-check-message {
+  margin: 0;
+  font-size: 0.88rem;
+  line-height: 1.4;
+  color: #8b9bb8;
+}
+
+.cost-check-status {
+  font-size: 0.75rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.cost-check.matched .cost-check-status {
+  color: #86efac;
+}
+
+.cost-check.off .cost-check-status,
+.cost-check.waiting .cost-check-status {
+  color: #f59e0b;
+}
+
+@media (max-width: 640px) {
+  .cost-check {
+    grid-template-columns: 6.25rem minmax(0, 1fr);
+  }
+
+  .cost-check-status {
+    grid-column: 2;
+  }
+}
+
+.cost-status-waiting {
+  color: #f59e0b;
+  font-weight: 600;
 }
 
 @media (max-width: 640px) {

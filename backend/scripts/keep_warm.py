@@ -6,7 +6,7 @@ Set HEALTH_PING_URL to your deployed API ready endpoint, e.g.:
   https://hotel-api.onrender.com/api/health/ready
 
 Ready checks hotel DATABASE_URL and, when set, TRANSACTION_DATABASE_URL
-so both Neon projects stay warm.
+so those Neon projects stay warm. A configured store sheet is checked too.
 """
 
 from __future__ import annotations

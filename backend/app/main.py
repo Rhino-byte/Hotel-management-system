@@ -3,8 +3,10 @@ from contextlib import asynccontextmanager
 
 from db.connection import (
     close_pool,
+    close_store_pool,
     close_transaction_pool,
     init_pool,
+    init_store_pool,
     init_transaction_pool,
     load_env_file,
 )
@@ -23,6 +25,8 @@ from app.routers import (
     audit_sales,
     auth,
     bar,
+    cost_report,
+    cost_settings,
     food_kuku,
     health,
     inventory,
@@ -40,7 +44,9 @@ validate_settings()
 async def lifespan(_app: FastAPI):
     init_pool()
     init_transaction_pool()
+    init_store_pool()
     yield
+    close_store_pool()
     close_transaction_pool()
     close_pool()
 
@@ -91,6 +97,8 @@ app.include_router(auth.router, prefix="/api")
 app.include_router(snacks_drinks.router, prefix="/api")
 app.include_router(food_kuku.router, prefix="/api")
 app.include_router(stock_items.router, prefix="/api")
+app.include_router(cost_settings.router, prefix="/api")
+app.include_router(cost_report.router, prefix="/api")
 app.include_router(bar.router, prefix="/api")
 app.include_router(inventory.router, prefix="/api")
 app.include_router(admin.router, prefix="/api")
