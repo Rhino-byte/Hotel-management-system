@@ -1,6 +1,7 @@
 from typing import FrozenSet, List
 
 ROLE_ADMIN = "admin"
+ROLE_MUM = "mum"
 ROLE_SNACKS_CLERK = "snacks_clerk"
 ROLE_FOOD_CLERK = "food_clerk"
 ROLE_STOCK_CLERK = "stock_clerk"
@@ -9,6 +10,7 @@ ROLE_BAR_CLERK = "bar_clerk"
 ALL_ROLES = frozenset(
     {
         ROLE_ADMIN,
+        ROLE_MUM,
         ROLE_SNACKS_CLERK,
         ROLE_FOOD_CLERK,
         ROLE_STOCK_CLERK,
@@ -25,6 +27,7 @@ ROLE_MODULES: dict[str, FrozenSet[str]] = {
     ROLE_ADMIN: frozenset(
         {MODULE_SNACKS_DRINKS, MODULE_FOOD_KUKU, MODULE_STOCK_ITEMS, MODULE_BAR}
     ),
+    ROLE_MUM: frozenset(),
     ROLE_SNACKS_CLERK: frozenset({MODULE_SNACKS_DRINKS}),
     ROLE_FOOD_CLERK: frozenset({MODULE_FOOD_KUKU}),
     ROLE_STOCK_CLERK: frozenset({MODULE_STOCK_ITEMS}),
@@ -45,7 +48,13 @@ def is_admin(role: str) -> bool:
     return role == ROLE_ADMIN
 
 
+def can_view_management(role: str) -> bool:
+    return role in (ROLE_ADMIN, ROLE_MUM)
+
+
 def default_route_for_role(role: str) -> str:
+    if role == ROLE_MUM:
+        return "/admin/management"
     modules = allowed_modules(role)
     if not modules:
         return "/login"

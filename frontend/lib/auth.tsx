@@ -98,7 +98,15 @@ export function useAuth() {
   return ctx;
 }
 
-export function useRequireAuth(allowedModules?: string[], requireAdmin = false) {
+export function canViewManagement(role: string | null | undefined): boolean {
+  return role === "admin" || role === "mum";
+}
+
+export function useRequireAuth(
+  allowedModules?: string[],
+  requireAdmin = false,
+  requireManagement = false,
+) {
   const { user, loading } = useAuth();
   const router = useRouter();
 
@@ -112,10 +120,14 @@ export function useRequireAuth(allowedModules?: string[], requireAdmin = false) 
       router.replace(user.default_route || "/login");
       return;
     }
+    if (requireManagement && !canViewManagement(user.role)) {
+      router.replace(user.default_route || "/login");
+      return;
+    }
     if (allowedModules && !allowedModules.some((m) => user.modules.includes(m))) {
       router.replace(user.default_route || "/login");
     }
-  }, [user, loading, allowedModules, requireAdmin, router]);
+  }, [user, loading, allowedModules, requireAdmin, requireManagement, router]);
 
   return { user, loading };
 }

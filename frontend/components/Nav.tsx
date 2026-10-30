@@ -13,13 +13,10 @@ const MODULE_LINKS = [
 ];
 
 const ADMIN_LINKS = [
-  { href: "/admin/analytics", label: "Analytics" },
-  { href: "/admin/cost-profit", label: "Cost & profit" },
+  { href: "/admin/management", label: "Management" },
   { href: "/admin/prices", label: "Prices" },
   { href: "/admin/stock-items", label: "Stock Catalog" },
   { href: "/admin/employees", label: "Employees" },
-  { href: "/admin/audit", label: "Audit" },
-  { href: "/admin/tills", label: "Tills" },
 ];
 
 const CLERK_AUDIT_LINK = { href: "/admin/audit", label: "Audit" };
@@ -60,7 +57,8 @@ export default function Nav() {
   if (!user || pathname === "/login") return null;
 
   const isAdmin = user.role === "admin";
-  const showClerkAudit = !isAdmin && user.modules.length > 0;
+  const isMum = user.role === "mum";
+  const showClerkAudit = !isAdmin && !isMum && user.modules.length > 0;
   const closeMenu = () => setMenuOpen(false);
 
   const moduleLinks = MODULE_LINKS.filter((l) => user.modules.includes(l.module));
@@ -86,6 +84,15 @@ export default function Nav() {
           onClick={onNavigate}
         >
           {CLERK_AUDIT_LINK.label}
+        </Link>
+      )}
+      {isMum && (
+        <Link
+          href="/admin/management"
+          className={pathname.startsWith("/admin/management") ? "nav-link active" : "nav-link"}
+          onClick={onNavigate}
+        >
+          Management
         </Link>
       )}
       {isAdmin &&

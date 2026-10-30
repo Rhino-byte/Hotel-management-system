@@ -3,7 +3,7 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 
-from app.deps import CurrentUser, require_admin
+from app.deps import CurrentUser, require_management
 from db import audit_sales as audit_sales_db
 
 
@@ -12,7 +12,7 @@ router = APIRouter(tags=["audit"])
 
 @router.get("/audit/sales-report")
 def sales_report(
-    _admin: Annotated[CurrentUser, Depends(require_admin)],
+    _user: Annotated[CurrentUser, Depends(require_management)],
     date_from: date = Query(...),
     date_to: date = Query(...),
 ):

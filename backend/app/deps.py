@@ -4,7 +4,7 @@ from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
 from app.security import safe_decode_token
-from core.roles import can_access_module, is_admin
+from core.roles import can_access_module, can_view_management, is_admin
 from db.employees import get_employee_by_id
 
 security = HTTPBearer(auto_error=False)
@@ -86,5 +86,14 @@ async def require_admin(user: Annotated[CurrentUser, Depends(get_current_user)])
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Admin access required",
+        )
+    return user
+
+
+async def require_management(user: Annotated[CurrentUser, Depends(get_current_user)]) -> CurrentUser:
+    if not can_view_management(user.role):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Management access required",
         )
     return user

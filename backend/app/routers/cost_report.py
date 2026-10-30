@@ -3,7 +3,7 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 
-from app.deps import CurrentUser, require_admin
+from app.deps import CurrentUser, require_management
 from db import cost_report as cost_report_db
 
 router = APIRouter(tags=["cost-report"])
@@ -11,7 +11,7 @@ router = APIRouter(tags=["cost-report"])
 
 @router.get("/cost-report")
 def get_cost_report(
-    _admin: Annotated[CurrentUser, Depends(require_admin)],
+    _user: Annotated[CurrentUser, Depends(require_management)],
     date_from: date = Query(...),
     date_to: date = Query(...),
 ):

@@ -3,7 +3,7 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 
-from app.deps import CurrentUser, require_admin
+from app.deps import CurrentUser, require_management
 from db import tills as tills_db
 
 router = APIRouter(tags=["tills"])
@@ -11,7 +11,7 @@ router = APIRouter(tags=["tills"])
 
 @router.get("/tills/report")
 def get_tills_report(
-    _admin: Annotated[CurrentUser, Depends(require_admin)],
+    _user: Annotated[CurrentUser, Depends(require_management)],
     date_from: date = Query(...),
     date_to: date = Query(...),
 ):

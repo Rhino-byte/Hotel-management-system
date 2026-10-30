@@ -296,5 +296,6 @@ export const HOTEL_ROLE_OPTIONS = [
   { value: "food_clerk", label: "Food Clerk" },
   { value: "stock_clerk", label: "Stock Clerk" },
   { value: "bar_clerk", label: "Bar Clerk" },
+  { value: "mum", label: "Mum" },
   { value: "admin", label: "Hotel Admin" },
 ];

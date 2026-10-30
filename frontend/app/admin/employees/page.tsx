@@ -132,6 +132,9 @@ function EmployeeRoleRow({
   useEffect(() => setHotelRole(employee.hotel_role || ""), [employee.hotel_role]);
 
   const isPayrollAdmin = employee.payroll_role === "ADMIN";
+  const effectiveLabel =
+    HOTEL_ROLE_OPTIONS.find((opt) => opt.value === employee.effective_hotel_role)?.label ||
+    (isPayrollAdmin ? "admin (payroll)" : "none");
   const hasAuth = employee.has_user_auth !== false;
   const nameMismatch =
     hasAuth &&
@@ -171,7 +174,7 @@ function EmployeeRoleRow({
           ))}
         </select>
       </td>
-      <td>{employee.effective_hotel_role || (isPayrollAdmin ? "admin (payroll)" : "none")}</td>
+      <td>{effectiveLabel}</td>
       <td>
         {!isPayrollAdmin && (
           <SaveButton saving={saving} onClick={() => onSave(employee, hotelRole)} />

@@ -3,7 +3,7 @@ from typing import Annotated, Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 
-from app.deps import CurrentUser, require_admin
+from app.deps import CurrentUser, require_management
 from db import analytics as analytics_db
 
 router = APIRouter(tags=["analytics"])
@@ -28,7 +28,7 @@ def _range_to_dates(range_key: str) -> tuple[date, date]:
 
 @router.get("/analytics/sales-totals")
 def get_sales_totals(
-    _admin: Annotated[CurrentUser, Depends(require_admin)],
+    _admin: Annotated[CurrentUser, Depends(require_management)],
     range: RangeKey | None = Query(None, alias="range"),
     entry_date: date | None = Query(None, alias="date"),
 ):
@@ -51,7 +51,7 @@ def get_sales_totals(
 
 @router.get("/analytics/items-sold")
 def get_items_sold(
-    _admin: Annotated[CurrentUser, Depends(require_admin)],
+    _admin: Annotated[CurrentUser, Depends(require_management)],
     category: CategoryKey = Query(...),
     entry_date: date = Query(..., alias="date"),
 ):
