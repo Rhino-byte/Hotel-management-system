@@ -265,7 +265,7 @@ export type CostReportLine = {
   category: CostCategory;
   data_source: CostDataSource;
   quantity: number | null;
-  purchase_price: number;
+  purchase_price: number | null;
   cost: number | null;
   status: CostLineStatus;
   other_destinations: Record<string, number>;

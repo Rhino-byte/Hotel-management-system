@@ -1,7 +1,7 @@
 """Live cost and profit for a hotel date range.
 
-Revenue reuses the snacks, drinks, food, and kuku sold formulas. Cost follows
-each cost_settings row. Store quantities come from the store database.
+Revenue reuses the snacks, drinks, food, and kuku sold formulas. Cost uses the
+rate snapshot in effect on each day. Store quantities come from the store database.
 """
 
 from __future__ import annotations
@@ -236,6 +236,16 @@ def _load_hotel(date_from: date, date_to: date) -> dict[str, Any]:
             ORDER BY display_order, name
             """
         ).fetchall()
+        rate_rows = conn.execute(
+            """
+            SELECT cost_setting_id, purchase_price,
+                   tea_cups_per_liter, white_coffee_cups_per_liter,
+                   bags_per_week, cylinder_cost_per_month,
+                   effective_from
+            FROM cost_setting_prices
+            ORDER BY cost_setting_id, effective_from ASC, id ASC
+            """
+        ).fetchall()
 
     snacks: dict[tuple[date, str], dict[str, Any]] = {}
     for row in snack_rows:
@@ -255,6 +265,10 @@ def _load_hotel(date_from: date, date_to: date) -> dict[str, Any]:
         if category in CATEGORY_LABELS:
             day_bucket[category] = day_bucket.get(category, 0.0) + float(row["revenue"] or 0)
 
+    rates: dict[int, list[dict[str, Any]]] = {}
+    for row in rate_rows:
+        rates.setdefault(int(row["cost_setting_id"]), []).append(_clean_rate(dict(row)))
+
     return {
         "snack_days": snack_locks | snack_closings,
         "food_days": food_locks | food_entries,
@@ -263,6 +277,7 @@ def _load_hotel(date_from: date, date_to: date) -> dict[str, Any]:
         "item_groups": item_groups,
         "revenue": revenue,
         "settings": [dict(row) for row in settings],
+        "rates": rates,
     }
 
 
@@ -316,15 +331,65 @@ def _side_totals(
     return other, correction_in
 
 
-def _finish_span(
-    values: list[Optional[float]], price: float
-) -> tuple[Optional[float], Optional[float], str]:
+def _clean_rate(row: dict[str, Any]) -> dict[str, Any]:
+    def optional(field: str) -> Optional[float]:
+        value = row.get(field)
+        return None if value is None else float(value)
+
+    return {
+        "effective_from": row["effective_from"],
+        "purchase_price": float(row.get("purchase_price") or 0),
+        "tea_cups_per_liter": optional("tea_cups_per_liter"),
+        "white_coffee_cups_per_liter": optional("white_coffee_cups_per_liter"),
+        "bags_per_week": optional("bags_per_week"),
+        "cylinder_cost_per_month": optional("cylinder_cost_per_month"),
+    }
+
+
+def _fallback_rate(setting: dict[str, Any]) -> dict[str, Any]:
+    return _clean_rate(
+        {
+            "effective_from": date(2000, 1, 1),
+            "purchase_price": setting.get("purchase_price") or 0,
+            "tea_cups_per_liter": setting.get("tea_cups_per_liter"),
+            "white_coffee_cups_per_liter": setting.get("white_coffee_cups_per_liter"),
+            "bags_per_week": setting.get("bags_per_week"),
+            "cylinder_cost_per_month": setting.get("cylinder_cost_per_month"),
+        }
+    )
+
+
+def _rate_on(
+    rates: dict[int, list[dict[str, Any]]],
+    setting: dict[str, Any],
+    day: date,
+) -> dict[str, Any]:
+    rows = rates.get(int(setting["id"])) or [_fallback_rate(setting)]
+    chosen = None
+    for row in rows:
+        if row["effective_from"] <= day:
+            chosen = row
+        else:
+            break
+    return chosen or rows[0]
+
+
+def _uniform_rate(values: list[Optional[float]]) -> Optional[float]:
+    if not values:
+        return None
+    first = values[0]
+    for value in values[1:]:
+        if first is None or value is None or round(float(first), 2) != round(float(value), 2):
+            return None
+    return None if first is None else float(first)
+
+
+def _span(values: list[Optional[float]]) -> tuple[Optional[float], str]:
     ready = [value for value in values if value is not None]
     if not ready:
-        return None, None, "waiting"
-    quantity = sum(ready)
+        return None, "waiting"
     status = "waiting" if len(ready) != len(values) else "ready"
-    return quantity, quantity * price, status
+    return sum(ready), status
 
 
 def _apply_day_cost(day_costs: dict[date, float], day: date, amount: float) -> None:
@@ -336,19 +401,29 @@ def _hotel_sold_line(
     hotel: dict[str, Any],
     days: list[date],
     day_costs: dict[date, float],
-) -> tuple[Optional[float], Optional[float], str, float]:
+    rates: dict[int, list[dict[str, Any]]],
+) -> tuple[Optional[float], Optional[float], str, Optional[float]]:
     item_key = name_key(setting.get("hotel_item_name"))
-    price = float(setting.get("purchase_price") or 0)
-    if not item_key:
-        return None, None, "waiting", price
-    daily: list[Optional[float]] = []
+    prices: list[Optional[float]] = []
+    quantities: list[Optional[float]] = []
+    cost_total = 0.0
+    any_ready = False
     for day in days:
+        price = float(_rate_on(rates, setting, day)["purchase_price"])
+        prices.append(price)
+        if not item_key:
+            quantities.append(None)
+            continue
         sold = _hotel_sold_on(hotel, day, item_key)
-        daily.append(sold)
-        if sold is not None:
-            _apply_day_cost(day_costs, day, sold * price)
-    quantity, cost, status = _finish_span(daily, price)
-    return quantity, cost, status, price
+        quantities.append(sold)
+        if sold is None:
+            continue
+        any_ready = True
+        amount = sold * price
+        cost_total += amount
+        _apply_day_cost(day_costs, day, amount)
+    quantity, status = _span(quantities)
+    return quantity, cost_total if any_ready else None, status, _uniform_rate(prices)
 
 
 def _store_line(
@@ -356,21 +431,28 @@ def _store_line(
     store: dict[str, Any],
     days: list[date],
     day_costs: dict[date, float],
-) -> tuple[Optional[float], Optional[float], str, float]:
+    rates: dict[int, list[dict[str, Any]]],
+) -> tuple[Optional[float], Optional[float], str, Optional[float]]:
     item_key = name_key(setting.get("store_item_name"))
-    price = float(setting.get("purchase_price") or 0)
-    if not item_key or store["status"] != "ok":
-        return None, None, "waiting", price
-    daily: list[Optional[float]] = []
+    prices: list[Optional[float]] = []
+    quantities: list[Optional[float]] = []
+    cost_total = 0.0
+    any_ready = False
+    store_ok = bool(item_key) and store["status"] == "ok"
     for day in days:
-        if not _store_ready(store, day):
-            daily.append(None)
+        price = float(_rate_on(rates, setting, day)["purchase_price"])
+        prices.append(price)
+        if not store_ok or not _store_ready(store, day):
+            quantities.append(None)
             continue
         qty = _kitchen_on(store, item_key, day)
-        daily.append(qty)
-        _apply_day_cost(day_costs, day, qty * price)
-    quantity, cost, status = _finish_span(daily, price)
-    return quantity, cost, status, price
+        quantities.append(qty)
+        any_ready = True
+        amount = qty * price
+        cost_total += amount
+        _apply_day_cost(day_costs, day, amount)
+    quantity, status = _span(quantities)
+    return quantity, cost_total if any_ready else None, status, _uniform_rate(prices)
 
 
 def _milk_line(
@@ -378,55 +460,91 @@ def _milk_line(
     hotel: dict[str, Any],
     days: list[date],
     day_costs: dict[date, float],
-) -> tuple[Optional[float], Optional[float], str, float]:
-    price = float(setting.get("purchase_price") or 0)
-    tea_rate = setting.get("tea_cups_per_liter")
-    white_rate = setting.get("white_coffee_cups_per_liter")
-    if tea_rate is None or white_rate is None or float(tea_rate) <= 0 or float(white_rate) <= 0:
-        return None, None, "waiting", price
-    tea_rate = float(tea_rate)
-    white_rate = float(white_rate)
-    daily: list[Optional[float]] = []
+    rates: dict[int, list[dict[str, Any]]],
+) -> tuple[Optional[float], Optional[float], str, Optional[float]]:
+    prices: list[Optional[float]] = []
+    quantities: list[Optional[float]] = []
+    cost_total = 0.0
+    any_ready = False
     for day in days:
+        rate = _rate_on(rates, setting, day)
+        price = float(rate["purchase_price"])
+        prices.append(price)
+        tea_rate = rate.get("tea_cups_per_liter")
+        white_rate = rate.get("white_coffee_cups_per_liter")
+        if (
+            tea_rate is None
+            or white_rate is None
+            or float(tea_rate) <= 0
+            or float(white_rate) <= 0
+        ):
+            quantities.append(None)
+            continue
         tea = _hotel_sold_on(hotel, day, TEA_ITEM)
         white = _hotel_sold_on(hotel, day, WHITE_COFFEE_ITEM)
         if tea is None or white is None:
-            daily.append(None)
+            quantities.append(None)
             continue
-        liters = tea / tea_rate + white / white_rate
-        daily.append(liters)
-        _apply_day_cost(day_costs, day, liters * price)
-    quantity, cost, status = _finish_span(daily, price)
-    return quantity, cost, status, price
+        liters = tea / float(tea_rate) + white / float(white_rate)
+        quantities.append(liters)
+        any_ready = True
+        amount = liters * price
+        cost_total += amount
+        _apply_day_cost(day_costs, day, amount)
+    quantity, status = _span(quantities)
+    return quantity, cost_total if any_ready else None, status, _uniform_rate(prices)
 
 
 def _policy_line(
     setting: dict[str, Any],
     days: list[date],
     day_costs: dict[date, float],
-) -> tuple[Optional[float], Optional[float], str, float]:
-    price = float(setting.get("purchase_price") or 0)
-    cylinder = setting.get("cylinder_cost_per_month")
-    bags = setting.get("bags_per_week")
-    if cylinder is not None:
-        rate = float(cylinder)
-        quantity = 0.0
-        cost = 0.0
-        for day in days:
+    rates: dict[int, list[dict[str, Any]]],
+) -> tuple[Optional[float], Optional[float], str, Optional[float]]:
+    prices: list[Optional[float]] = []
+    shown: list[Optional[float]] = []
+    quantities: list[Optional[float]] = []
+    cost_total = 0.0
+    any_ready = False
+    kind: Optional[str] = None
+    mixed = False
+    for day in days:
+        rate = _rate_on(rates, setting, day)
+        price = float(rate["purchase_price"])
+        prices.append(price)
+        cylinder = rate.get("cylinder_cost_per_month")
+        bags = rate.get("bags_per_week")
+        if cylinder is not None:
+            if kind not in (None, "cylinder"):
+                mixed = True
+            kind = "cylinder"
             days_in_month = calendar.monthrange(day.year, day.month)[1]
             share = 1.0 / days_in_month
-            quantity += share
-            day_cost = rate / days_in_month
-            cost += day_cost
+            day_cost = float(cylinder) / days_in_month
+            quantities.append(share)
+            shown.append(float(cylinder))
+            any_ready = True
+            cost_total += day_cost
             _apply_day_cost(day_costs, day, day_cost)
-        return quantity, cost, "ready", rate
-    if bags is not None:
-        daily_bags = float(bags) / 7.0
-        quantity = daily_bags * len(days)
-        for day in days:
-            _apply_day_cost(day_costs, day, daily_bags * price)
-        return quantity, quantity * price, "ready", price
-    return None, None, "waiting", price
+        elif bags is not None:
+            if kind not in (None, "price"):
+                mixed = True
+            kind = "price"
+            daily_bags = float(bags) / 7.0
+            day_cost = daily_bags * price
+            quantities.append(daily_bags)
+            shown.append(price)
+            any_ready = True
+            cost_total += day_cost
+            _apply_day_cost(day_costs, day, day_cost)
+        else:
+            quantities.append(None)
+            shown.append(None)
+    quantity, status = _span(quantities)
+    display = _uniform_rate(prices) if not any(value is not None for value in shown) else _uniform_rate(shown)
+    if mixed:
+        display = None
+    return quantity, cost_total if any_ready else None, status, display
 
 
 def _line_payload(
@@ -434,7 +552,7 @@ def _line_payload(
     quantity: Optional[float],
     cost: Optional[float],
     status: str,
-    purchase_price: float,
+    purchase_price: Optional[float],
     other: dict[str, float],
     correction_in: float,
 ) -> dict[str, Any]:
@@ -444,7 +562,7 @@ def _line_payload(
         "category": setting["category"],
         "data_source": setting["data_source"],
         "quantity": None if quantity is None else _round(quantity),
-        "purchase_price": _round(purchase_price),
+        "purchase_price": None if purchase_price is None else _round(purchase_price),
         "cost": None if cost is None else _round(cost),
         "status": status,
         "other_destinations": {
@@ -460,20 +578,23 @@ def _build_lines(
     store: dict[str, Any],
     days: list[date],
     day_costs: dict[date, float],
+    rates: dict[int, list[dict[str, Any]]],
 ) -> list[dict[str, Any]]:
     lines = []
     for setting in settings:
         source = setting["data_source"]
         if source == "hotel_sold":
-            quantity, cost, status, price = _hotel_sold_line(setting, hotel, days, day_costs)
+            quantity, cost, status, price = _hotel_sold_line(setting, hotel, days, day_costs, rates)
         elif source == "store_stock_out":
-            quantity, cost, status, price = _store_line(setting, store, days, day_costs)
+            quantity, cost, status, price = _store_line(setting, store, days, day_costs, rates)
         elif source == "recipe_milk":
-            quantity, cost, status, price = _milk_line(setting, hotel, days, day_costs)
+            quantity, cost, status, price = _milk_line(setting, hotel, days, day_costs, rates)
         elif source == "policy_rate":
-            quantity, cost, status, price = _policy_line(setting, days, day_costs)
+            quantity, cost, status, price = _policy_line(setting, days, day_costs, rates)
         else:
-            quantity, cost, status, price = None, None, "waiting", float(setting.get("purchase_price") or 0)
+            quantity, cost, status, price = None, None, "waiting", _uniform_rate(
+                [float(_rate_on(rates, setting, day)["purchase_price"]) for day in days]
+            )
         other, correction_in = _side_totals(
             store, name_key(setting.get("store_item_name")), days[0], days[-1]
         )
@@ -539,23 +660,65 @@ def _water_checks(
     return checks
 
 
+def _week_is_gas(
+    rates: dict[int, list[dict[str, Any]]],
+    setting: dict[str, Any],
+    week_start: date,
+    week_end: date,
+) -> bool:
+    for day in _iter_days(week_start, week_end):
+        if _rate_on(rates, setting, day).get("cylinder_cost_per_month") is None:
+            return False
+    return True
+
+
+def _week_bag_rate(
+    rates: dict[int, list[dict[str, Any]]],
+    setting: dict[str, Any],
+    week_start: date,
+    week_end: date,
+) -> Optional[float]:
+    """Sum of each day's bags/7. None when the week is not a single makaa rate."""
+    expected = 0.0
+    for day in _iter_days(week_start, week_end):
+        rate = _rate_on(rates, setting, day)
+        if rate.get("cylinder_cost_per_month") is not None or rate.get("bags_per_week") is None:
+            return None
+        expected += float(rate["bags_per_week"]) / 7.0
+    return expected
+
+
 def _makaa_checks(
     settings: list[dict[str, Any]],
     store: dict[str, Any],
     date_from: date,
     date_to: date,
+    rates: dict[int, list[dict[str, Any]]],
 ) -> list[dict[str, Any]]:
     checks = []
     for setting in settings:
-        if setting["data_source"] != "policy_rate" or setting.get("cylinder_cost_per_month") is not None:
+        if setting["data_source"] != "policy_rate":
             continue
-        bags = setting.get("bags_per_week")
         store_key = name_key(setting.get("store_item_name"))
-        if bags is None or not store_key:
+        if not store_key:
             continue
-        expected = float(bags)
         for week_start, week_end in _weeks_touching(date_from, date_to):
             label = f"{week_start.isoformat()} to {week_end.isoformat()}"
+            expected = _week_bag_rate(rates, setting, week_start, week_end)
+            if expected is None:
+                if _week_is_gas(rates, setting, week_start, week_end):
+                    continue
+                checks.append(
+                    {
+                        "kind": "makaa",
+                        "ok": False,
+                        "message": (
+                            f"Makaa week {label}: the bag rate is missing for part of the week, "
+                            "so the bag check is waiting."
+                        ),
+                    }
+                )
+                continue
             if store["status"] != "ok":
                 checks.append(
                     {
@@ -679,7 +842,8 @@ def cost_report(date_from: date, date_to: date) -> dict[str, Any]:
     span_from, span_to = _store_span(date_from, date_to)
     store = load_movements(span_from, span_to)
     day_costs: dict[date, float] = {}
-    lines = _build_lines(hotel["settings"], hotel, store, days, day_costs)
+    rates = hotel["rates"]
+    lines = _build_lines(hotel["settings"], hotel, store, days, day_costs, rates)
 
     groups = []
     for key in CATEGORIES:
@@ -724,7 +888,7 @@ def cost_report(date_from: date, date_to: date) -> dict[str, Any]:
 
     checks = []
     checks.extend(_water_checks(hotel["settings"], hotel, store, days))
-    checks.extend(_makaa_checks(hotel["settings"], store, date_from, date_to))
+    checks.extend(_makaa_checks(hotel["settings"], store, date_from, date_to, rates))
     checks.extend(_gas_checks(hotel["settings"], store, date_from, date_to))
     checks.extend(_duplicate_checks(hotel["settings"]))
 

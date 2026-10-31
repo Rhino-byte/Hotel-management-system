@@ -1,6 +1,7 @@
 from typing import Any, Optional
 
 from db.connection import get_conn
+from db.price_sql import CATALOG_PRICE_EPOCH, hotel_today
 from db.store import list_item_names
 
 CATEGORIES = ("snacks", "drinks", "food", "kuku")
@@ -13,6 +14,7 @@ _NUMERIC_FIELDS = (
     "bags_per_week",
     "cylinder_cost_per_month",
 )
+_RATE_FIELDS = _NUMERIC_FIELDS
 
 
 def _clean(row: dict[str, Any]) -> dict[str, Any]:
@@ -144,6 +146,64 @@ def _normalize(payload: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def _rate_value(row: Optional[dict[str, Any]], field: str) -> Optional[float]:
+    if row is None:
+        return None
+    value = row.get(field)
+    if value is None:
+        return None
+    return round(float(value), 2)
+
+
+def _rates_changed(previous: Optional[dict[str, Any]], fields: dict[str, Any]) -> bool:
+    if previous is None:
+        return True
+    return any(_rate_value(previous, field) != _rate_value(fields, field) for field in _RATE_FIELDS)
+
+
+def _insert_rate_snapshot(conn, setting_id: int, fields: dict[str, Any], effective_from, user_id: int) -> None:
+    conn.execute(
+        """
+        INSERT INTO cost_setting_prices (
+          cost_setting_id, purchase_price,
+          tea_cups_per_liter, white_coffee_cups_per_liter,
+          bags_per_week, cylinder_cost_per_month,
+          effective_from, updated_by
+        ) VALUES (
+          %(cost_setting_id)s, %(purchase_price)s,
+          %(tea_cups_per_liter)s, %(white_coffee_cups_per_liter)s,
+          %(bags_per_week)s, %(cylinder_cost_per_month)s,
+          %(effective_from)s, %(updated_by)s
+        )
+        """,
+        {
+            "cost_setting_id": setting_id,
+            "purchase_price": fields["purchase_price"],
+            "tea_cups_per_liter": fields["tea_cups_per_liter"],
+            "white_coffee_cups_per_liter": fields["white_coffee_cups_per_liter"],
+            "bags_per_week": fields["bags_per_week"],
+            "cylinder_cost_per_month": fields["cylinder_cost_per_month"],
+            "effective_from": effective_from,
+            "updated_by": user_id,
+        },
+    )
+
+
+def _latest_rate_snapshot(conn, setting_id: int) -> Optional[dict[str, Any]]:
+    row = conn.execute(
+        """
+        SELECT purchase_price, tea_cups_per_liter, white_coffee_cups_per_liter,
+               bags_per_week, cylinder_cost_per_month
+        FROM cost_setting_prices
+        WHERE cost_setting_id = %s
+        ORDER BY effective_from DESC, id DESC
+        LIMIT 1
+        """,
+        (setting_id,),
+    ).fetchone()
+    return None if row is None else dict(row)
+
+
 def create_cost_setting(payload: dict[str, Any], user_id: int) -> dict[str, Any]:
     fields = _normalize(payload)
     with get_conn() as conn:
@@ -179,6 +239,7 @@ def create_cost_setting(payload: dict[str, Any], user_id: int) -> dict[str, Any]
             """,
             {**fields, "display_order": int(order_row["next_order"]), "updated_by": user_id},
         ).fetchone()
+        _insert_rate_snapshot(conn, int(row["id"]), fields, CATALOG_PRICE_EPOCH, user_id)
     return _clean(dict(row))
 
 
@@ -194,6 +255,7 @@ def update_cost_setting(setting_id: int, payload: dict[str, Any], user_id: int) 
         ).fetchone()
         if clash:
             raise ValueError("An item with this name already exists")
+        previous = _latest_rate_snapshot(conn, setting_id)
         row = conn.execute(
             """
             UPDATE cost_settings SET
@@ -220,4 +282,6 @@ def update_cost_setting(setting_id: int, payload: dict[str, Any], user_id: int) 
         ).fetchone()
         if row is None:
             raise LookupError("Cost setting not found")
+        if _rates_changed(previous, fields):
+            _insert_rate_snapshot(conn, setting_id, fields, hotel_today(), user_id)
     return _clean(dict(row))

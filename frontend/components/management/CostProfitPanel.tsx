@@ -472,7 +472,7 @@ export default function CostProfitPanel() {
                           <td>{CATEGORY_LABELS[line.category]}</td>
                           <td>{SOURCE_LABELS[line.data_source]}</td>
                           <td>{line.quantity == null ? "—" : formatQty(line.quantity)}</td>
-                          <td>{formatKsh(line.purchase_price)}</td>
+                          <td>{line.purchase_price == null ? "Varies" : formatKsh(line.purchase_price)}</td>
                           <td>{line.cost == null ? "—" : formatKsh(line.cost)}</td>
                           <td className={line.status === "waiting" ? "cost-status-waiting" : undefined}>
                             {line.status === "waiting" ? "Waiting" : "Ready"}
