@@ -3,7 +3,6 @@
 import { useCallback, useEffect, useState } from "react";
 import {
   CartesianGrid,
-  Legend,
   Line,
   LineChart,
   ResponsiveContainer,
@@ -24,6 +23,20 @@ import type {
 
 const REVENUE_COLOR = "#3d8bfd";
 const COST_COLOR = "#f59e0b";
+const PROFIT_COLOR = "#86efac";
+
+type SeriesKey = "revenue" | "cost" | "profit";
+
+const CHART_SERIES: { key: SeriesKey; label: string; color: string }[] = [
+  { key: "revenue", label: "Revenue", color: REVENUE_COLOR },
+  { key: "cost", label: "Cost", color: COST_COLOR },
+  { key: "profit", label: "Profit", color: PROFIT_COLOR },
+];
+
+function seriesLabel(name: unknown): string {
+  const match = CHART_SERIES.find((item) => item.key === name || item.label === name);
+  return match ? match.label : String(name ?? "");
+}
 
 const CATEGORY_LABELS = {
   snacks: "Snacks",
@@ -214,6 +227,11 @@ export default function CostProfitPanel() {
   const [error, setError] = useState<string | null>(null);
   const [category, setCategory] = useState<CostCategory | null>(null);
   const [sort, setSort] = useState<{ key: LineSortKey; dir: SortDir } | null>(null);
+  const [seriesOn, setSeriesOn] = useState<Record<SeriesKey, boolean>>({
+    revenue: true,
+    cost: true,
+    profit: true,
+  });
 
   const loadReport = useCallback(async () => {
     if (!dateFrom || !dateTo) {
@@ -294,6 +312,13 @@ export default function CostProfitPanel() {
   };
 
   const showChart = Boolean(report && report.date_from !== report.date_to);
+  const chartDays = report
+    ? report.days.map((day) => ({
+        ...day,
+        profit: Number(day.revenue) - Number(day.cost),
+      }))
+    : [];
+  const anySeriesOn = CHART_SERIES.some((item) => seriesOn[item.key]);
 
   return (
     <>
@@ -412,15 +437,36 @@ export default function CostProfitPanel() {
               <section className="analytics-section">
                 <div className="analytics-section-head">
                   <div>
-                    <h2 className="analytics-section-title">Revenue and cost by day</h2>
+                    <h2 className="analytics-section-title">Revenue, cost, and profit by day</h2>
                     <p className="analytics-meta">
                       Cost includes only days whose source is already in.
                     </p>
                   </div>
+                  <div className="chart-series-toggles" role="group" aria-label="Chart series">
+                    {CHART_SERIES.map((item) => (
+                      <label key={item.key} className="chart-series-toggle" style={{ color: item.color }}>
+                        <input
+                          type="checkbox"
+                          checked={seriesOn[item.key]}
+                          style={{ accentColor: item.color }}
+                          onChange={() =>
+                            setSeriesOn((current) => ({
+                              ...current,
+                              [item.key]: !current[item.key],
+                            }))
+                          }
+                        />
+                        {item.label}
+                      </label>
+                    ))}
+                  </div>
                 </div>
+                {!anySeriesOn && (
+                  <p className="analytics-meta">Select revenue, cost, or profit.</p>
+                )}
                 <div className="analytics-chart">
                   <ResponsiveContainer width="100%" height="100%">
-                    <LineChart data={report.days}>
+                    <LineChart data={chartDays}>
                       <CartesianGrid stroke="#1f2a44" strokeDasharray="3 3" />
                       <XAxis
                         dataKey="day"
@@ -441,26 +487,39 @@ export default function CostProfitPanel() {
                         labelStyle={{ color: "#8b9bb8" }}
                         formatter={(value, name) => [
                           `KSh ${formatKsh(Number(value ?? 0))}`,
-                          name === "revenue" ? "Revenue" : "Cost",
+                          seriesLabel(name),
                         ]}
                       />
-                      <Legend />
-                      <Line
-                        type="monotone"
-                        dataKey="revenue"
-                        name="Revenue"
-                        stroke={REVENUE_COLOR}
-                        strokeWidth={2}
-                        dot={{ r: 3, fill: REVENUE_COLOR }}
-                      />
-                      <Line
-                        type="monotone"
-                        dataKey="cost"
-                        name="Cost"
-                        stroke={COST_COLOR}
-                        strokeWidth={2}
-                        dot={{ r: 3, fill: COST_COLOR }}
-                      />
+                      {seriesOn.revenue && (
+                        <Line
+                          type="monotone"
+                          dataKey="revenue"
+                          name="Revenue"
+                          stroke={REVENUE_COLOR}
+                          strokeWidth={2}
+                          dot={{ r: 3, fill: REVENUE_COLOR }}
+                        />
+                      )}
+                      {seriesOn.cost && (
+                        <Line
+                          type="monotone"
+                          dataKey="cost"
+                          name="Cost"
+                          stroke={COST_COLOR}
+                          strokeWidth={2}
+                          dot={{ r: 3, fill: COST_COLOR }}
+                        />
+                      )}
+                      {seriesOn.profit && (
+                        <Line
+                          type="monotone"
+                          dataKey="profit"
+                          name="Profit"
+                          stroke={PROFIT_COLOR}
+                          strokeWidth={2}
+                          dot={{ r: 3, fill: PROFIT_COLOR }}
+                        />
+                      )}
                     </LineChart>
                   </ResponsiveContainer>
                 </div>
