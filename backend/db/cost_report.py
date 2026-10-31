@@ -632,17 +632,20 @@ def _water_checks(
                 mismatches.append(
                     f"{setting['name']} on {day.isoformat()}: store stock out {_qty_text(kitchen)} vs hotel Add {_qty_text(added)}."
                 )
+        name = str(setting["name"])
         if mismatches:
             checks.extend(
-                {"kind": "water", "ok": False, "message": message} for message in mismatches
+                {"kind": "water", "label": name, "ok": False, "message": message}
+                for message in mismatches
             )
         if waiting:
             checks.append(
                 {
                     "kind": "water",
+                    "label": name,
                     "ok": False,
                     "message": (
-                        f"{setting['name']}: store stock out or hotel Add is waiting on {waiting} day"
+                        f"{name}: store stock out or hotel Add is waiting on {waiting} day"
                         f"{'' if waiting == 1 else 's'}."
                     ),
                 }
@@ -651,9 +654,10 @@ def _water_checks(
             checks.append(
                 {
                     "kind": "water",
+                    "label": name,
                     "ok": True,
                     "message": (
-                        f"{setting['name']}: store stock out matched hotel Add on every day in this range."
+                        f"{name}: store stock out matched hotel Add on every day in this range."
                     ),
                 }
             )

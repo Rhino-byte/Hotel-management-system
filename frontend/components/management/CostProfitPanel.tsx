@@ -68,6 +68,24 @@ function checkTone(check: CostReportCheck): CheckTone {
 }
 
 type Preset = "yesterday" | "week" | "month";
+type LineSortKey = "quantity" | "purchase_price" | "cost";
+type SortDir = "asc" | "desc";
+
+function toggleSort(
+  current: { key: LineSortKey; dir: SortDir } | null,
+  key: LineSortKey
+): { key: LineSortKey; dir: SortDir } | null {
+  if (!current || current.key !== key) return { key, dir: "desc" };
+  if (current.dir === "desc") return { key, dir: "asc" };
+  return null;
+}
+
+function compareNullable(a: number | null, b: number | null, dir: SortDir): number {
+  if (a == null && b == null) return 0;
+  if (a == null) return 1;
+  if (b == null) return -1;
+  return dir === "asc" ? a - b : b - a;
+}
 
 function formatKsh(value: number): string {
   return Number(value).toLocaleString(undefined, {
@@ -164,7 +182,9 @@ function CostChecks({ checks }: { checks: CostReportCheck[] }) {
 function CostCheckCard({ check, tone }: { check: CostReportCheck; tone: CheckTone }) {
   return (
     <li className={`cost-check ${tone}`}>
-      <span className="cost-check-kind">{CHECK_KIND_LABELS[check.kind]}</span>
+      <span className="cost-check-kind">
+        {check.kind === "water" && check.label ? check.label : CHECK_KIND_LABELS[check.kind]}
+      </span>
       <p className="cost-check-message">{check.message}</p>
       <span className="cost-check-status">{CHECK_TONE_LABELS[tone]}</span>
     </li>
@@ -193,6 +213,7 @@ export default function CostProfitPanel() {
   const [reportLoading, setReportLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [category, setCategory] = useState<CostCategory | null>(null);
+  const [sort, setSort] = useState<{ key: LineSortKey; dir: SortDir } | null>(null);
 
   const loadReport = useCallback(async () => {
     if (!dateFrom || !dateTo) {
@@ -261,6 +282,16 @@ export default function CostProfitPanel() {
       ? report.lines.filter((line) => line.category === category)
       : report.lines
     : [];
+  const sortedLines = sort
+    ? [...visibleLines].sort((a, b) => compareNullable(a[sort.key], b[sort.key], sort.dir))
+    : visibleLines;
+
+  const sortLabel = (key: LineSortKey, label: string) =>
+    sort?.key === key ? `${label} ${sort.dir === "asc" ? "↑" : "↓"}` : label;
+  const ariaSort = (key: LineSortKey): "ascending" | "descending" | "none" => {
+    if (sort?.key !== key) return "none";
+    return sort.dir === "asc" ? "ascending" : "descending";
+  };
 
   const showChart = Boolean(report && report.date_from !== report.date_to);
 
@@ -449,9 +480,21 @@ export default function CostProfitPanel() {
                       <th>Item</th>
                       <th>Category</th>
                       <th>Source</th>
-                      <th>Quantity</th>
-                      <th>Purchase price</th>
-                      <th>Cost (KSh)</th>
+                      <th aria-sort={ariaSort("quantity")}>
+                        <button type="button" className="sort-th" onClick={() => setSort((current) => toggleSort(current, "quantity"))}>
+                          {sortLabel("quantity", "Quantity")}
+                        </button>
+                      </th>
+                      <th aria-sort={ariaSort("purchase_price")}>
+                        <button type="button" className="sort-th" onClick={() => setSort((current) => toggleSort(current, "purchase_price"))}>
+                          {sortLabel("purchase_price", "Purchase price")}
+                        </button>
+                      </th>
+                      <th aria-sort={ariaSort("cost")}>
+                        <button type="button" className="sort-th" onClick={() => setSort((current) => toggleSort(current, "cost"))}>
+                          {sortLabel("cost", "Cost (KSh)")}
+                        </button>
+                      </th>
                       <th>Status</th>
                       <th>Other destinations</th>
                     </tr>
@@ -466,7 +509,7 @@ export default function CostProfitPanel() {
                         </td>
                       </tr>
                     ) : (
-                      visibleLines.map((line) => (
+                      sortedLines.map((line) => (
                         <tr key={line.id}>
                           <td>{line.name}</td>
                           <td>{CATEGORY_LABELS[line.category]}</td>

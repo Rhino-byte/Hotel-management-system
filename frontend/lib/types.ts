@@ -274,6 +274,7 @@ export type CostReportLine = {
 
 export type CostReportCheck = {
   kind: "water" | "makaa" | "gas" | "duplicate";
+  label?: string;
   ok: boolean;
   message: string;
 };
